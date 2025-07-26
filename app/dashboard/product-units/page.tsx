@@ -1,7 +1,5 @@
 "use client"
-
 import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -15,9 +13,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Edit, Trash2, Search, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Loader2, RotateCcw } from "lucide-react" // RotateCcw icon added
 import Swal from "sweetalert2"
-import { FloatingLabelInput } from "@/components/floating-label-input" // FloatingLabelInput import edildi
+import { FloatingLabelInput } from "@/components/floating-label-input"
 
 interface Unit {
   id: number
@@ -48,9 +46,7 @@ export default function UnitsPage() {
       setLoading(false)
       return
     }
-
     setLoading(true)
-
     try {
       const response = await fetch(`http://localhost:8080/api/product-units/filter`, {
         method: "POST",
@@ -60,7 +56,6 @@ export default function UnitsPage() {
         },
         body: JSON.stringify(filterParams),
       })
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Naməlum xəta" }))
         console.error("Ölçü vahidlərini çəkərkən xəta:", response.status, errorData)
@@ -73,7 +68,6 @@ export default function UnitsPage() {
         setUnits([])
         return
       }
-
       const data = await response.json()
       console.log("Vahid API cavabı:", data)
       setUnits(Array.isArray(data) ? data : [])
@@ -99,20 +93,21 @@ export default function UnitsPage() {
     fetchUnits({ name: filterName })
   }
 
+  const resetFilters = () => {
+    setFilterName("")
+    fetchUnits({})
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const token = localStorage.getItem("token")
     if (!token) return
-
     setIsSubmittingForm(true)
-
     try {
       const url = editingUnit
           ? `http://localhost:8080/api/product-units/${editingUnit.id}`
           : "http://localhost:8080/api/product-units"
-
       const method = editingUnit ? "PUT" : "POST"
-
       const response = await fetch(url, {
         method,
         headers: {
@@ -121,14 +116,12 @@ export default function UnitsPage() {
         },
         body: JSON.stringify(formData),
       })
-
       let responseData: ApiResponse = {}
       try {
         responseData = await response.json()
       } catch (e) {
         responseData = {}
       }
-
       if (response.ok) {
         await Swal.fire({
           title: "Uğurlu!",
@@ -179,20 +172,15 @@ export default function UnitsPage() {
       cancelButtonText: "Ləğv et",
       reverseButtons: true,
     })
-
     if (!result.isConfirmed) return
-
     const token = localStorage.getItem("token")
     if (!token) return
-
     setDeletingId(id)
-
     try {
       const response = await fetch(`http://localhost:8080/api/product-units/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-
       if (response.ok) {
         await Swal.fire({
           title: "Silindi!",
@@ -210,7 +198,6 @@ export default function UnitsPage() {
         } catch (e) {
           responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
         }
-
         await Swal.fire({
           title: "Xəta!",
           text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
@@ -293,11 +280,9 @@ export default function UnitsPage() {
             </DialogContent>
           </Dialog>
         </div>
-
         <Card>
           <CardHeader>
             <div className="flex items-center space-x-2">
-              <Search className="h-4 w-4 text-gray-400" />
               <FloatingLabelInput
                   id="unit-search" // Unikal ID əlavə edildi
                   label="Ölçü vahidi axtar..."
@@ -305,11 +290,13 @@ export default function UnitsPage() {
                   onChange={(e) => setFilterName(e.target.value)}
                   className="max-w-sm"
               />
-              <Button onClick={handleFilter} size="icon">
-                {" "}
-                {/* size="icon" əlavə edildi */}
-                <Search className="h-4 w-4" /> {/* İkon əlavə edildi */}
-                <span className="sr-only">Filter</span> {/* Əlçatanlıq üçün əlavə edildi */}
+              <Button onClick={handleFilter} size="icon" title="Filterlə">
+                <Search className="h-4 w-4" />
+                <span className="sr-only">Filter</span>
+              </Button>
+              <Button onClick={resetFilters} size="icon" variant="outline" title="Filterləri sıfırla">
+                <RotateCcw className="h-4 w-4" />
+                <span className="sr-only">Filterləri sıfırla</span>
               </Button>
             </div>
           </CardHeader>

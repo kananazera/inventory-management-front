@@ -1,9 +1,5 @@
 "use client"
-
-import { Input } from "@/components/ui/input"
-
 import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -17,7 +13,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Edit, Trash2, Search, Loader2 } from "lucide-react" // Loader2 import edildi
+import { Plus, Edit, Trash2, Search, Loader2, RotateCcw } from "lucide-react" // RotateCcw icon added
 import Swal from "sweetalert2"
 import { FloatingLabelInput } from "@/components/floating-label-input"
 
@@ -38,12 +34,11 @@ export default function BrandsPage() {
     const [loading, setLoading] = useState(true)
     const [dialogOpen, setDialogOpen] = useState(false)
     const [editingBrand, setEditingBrand] = useState<Brand | null>(null)
-    const [searchTerm, setSearchTerm] = useState("") // Filter input state
+    const [filterName, setFilterName] = useState("") // Filter input state
     const [formData, setFormData] = useState({ name: "" })
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
 
-    // fetchBrands funksiyasını useCallback ilə sarıyırıq
     const fetchBrands = useCallback(async (filterParams: { name?: string }) => {
         const token = localStorage.getItem("token")
         if (!token) {
@@ -51,20 +46,16 @@ export default function BrandsPage() {
             setLoading(false)
             return
         }
-
         setLoading(true)
-
         try {
-            // Düzəliş: Brendlər üçün xüsusi filter endpointi və POST metodu istifadə olunur
             const response = await fetch(`http://localhost:8080/api/product-brands/filter`, {
-                method: "POST", // Metod POST olaraq dəyişdirildi
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(filterParams), // Filter parametrləri body-də JSON olaraq göndərilir
+                body: JSON.stringify(filterParams),
             })
-
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("Brendləri çəkərkən xəta:", response.status, errorData)
@@ -77,9 +68,8 @@ export default function BrandsPage() {
                 setBrands([])
                 return
             }
-
             const data = await response.json()
-            console.log("Brend API cavabı:", data) // API cavabını konsola yazdırırıq
+            console.log("Brend API cavabı:", data)
             setBrands(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error("Brendləri çəkərkən bağlantı xətası:", error)
@@ -95,30 +85,29 @@ export default function BrandsPage() {
         }
     }, [])
 
-    // Səhifə ilk yükləndikdə bütün brendləri çəkmək üçün useEffect
     useEffect(() => {
-        fetchBrands({}) // İlkin yüklənmə üçün boş filter obyekti göndərilir
+        fetchBrands({})
     }, [fetchBrands])
 
-    // Filter düyməsinə basıldıqda işə düşəcək funksiya
     const handleFilter = () => {
-        fetchBrands({ name: searchTerm })
+        fetchBrands({ name: filterName })
+    }
+
+    const resetFilters = () => {
+        setFilterName("")
+        fetchBrands({})
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const token = localStorage.getItem("token")
         if (!token) return
-
         setIsSubmittingForm(true)
-
         try {
             const url = editingBrand
                 ? `http://localhost:8080/api/product-brands/${editingBrand.id}`
                 : "http://localhost:8080/api/product-brands"
-
             const method = editingBrand ? "PUT" : "POST"
-
             const response = await fetch(url, {
                 method,
                 headers: {
@@ -127,14 +116,12 @@ export default function BrandsPage() {
                 },
                 body: JSON.stringify(formData),
             })
-
             let responseData: ApiResponse = {}
             try {
                 responseData = await response.json()
             } catch (e) {
                 responseData = {}
             }
-
             if (response.ok) {
                 await Swal.fire({
                     title: "Uğurlu!",
@@ -146,7 +133,7 @@ export default function BrandsPage() {
                 })
                 setDialogOpen(false)
                 resetForm()
-                fetchBrands({}) // Əməliyyatdan sonra məlumatları yenilə
+                fetchBrands({})
             } else {
                 await Swal.fire({
                     title: "Xəta!",
@@ -185,20 +172,15 @@ export default function BrandsPage() {
             cancelButtonText: "Ləğv et",
             reverseButtons: true,
         })
-
         if (!result.isConfirmed) return
-
         const token = localStorage.getItem("token")
         if (!token) return
-
         setDeletingId(id)
-
         try {
             const response = await fetch(`http://localhost:8080/api/product-brands/${id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` },
             })
-
             if (response.ok) {
                 await Swal.fire({
                     title: "Silindi!",
@@ -208,7 +190,7 @@ export default function BrandsPage() {
                     timer: 2000,
                     timerProgressBar: true,
                 })
-                fetchBrands({}) // Əməliyyatdan sonra məlumatları yenilə
+                fetchBrands({})
             } else {
                 let responseData: ApiResponse = {}
                 try {
@@ -216,7 +198,6 @@ export default function BrandsPage() {
                 } catch (e) {
                     responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
                 }
-
                 await Swal.fire({
                     title: "Xəta!",
                     text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
@@ -244,7 +225,7 @@ export default function BrandsPage() {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-10 w-10 animate-spin text-black" /> {/* Animasiyalı ikon əlavə edildi */}
+                <Loader2 className="h-10 w-10 animate-spin text-black" />
             </div>
         )
     }
@@ -272,12 +253,11 @@ export default function BrandsPage() {
                             <div className="grid gap-4 py-4">
                                 <div className="space-y-2">
                                     <FloatingLabelInput
-                                        id="name"
+                                        id="brand-name"
                                         label="Ad *"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                         required
-                                        placeholder="Brend adı"
                                         disabled={isSubmittingForm}
                                     />
                                 </div>
@@ -293,29 +273,30 @@ export default function BrandsPage() {
                                 </Button>
                                 <Button type="submit" disabled={isSubmittingForm}>
                                     {isSubmittingForm && <Loader2 className="mr-2 h-6 w-6 animate-spin text-black" />}
-                                    Əlavə et
+                                    {editingBrand ? "Yenilə" : "Əlavə et"}
                                 </Button>
                             </DialogFooter>
                         </form>
                     </DialogContent>
                 </Dialog>
             </div>
-
             <Card>
                 <CardHeader>
                     <div className="flex items-center space-x-2">
-                        <Search className="h-4 w-4 text-gray-400" />
-                        <Input
-                            placeholder="Brend axtar..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                        <FloatingLabelInput
+                            id="brand-search" // Unikal ID əlavə edildi
+                            label="Brend axtar..."
+                            value={filterName}
+                            onChange={(e) => setFilterName(e.target.value)}
                             className="max-w-sm"
                         />
-                        <Button onClick={handleFilter} size="icon">
-                            {" "}
-                            {/* size="icon" əlavə edildi */}
-                            <Search className="h-4 w-4" /> {/* İkon əlavə edildi */}
-                            <span className="sr-only">Filter</span> {/* Əlçatanlıq üçün əlavə edildi */}
+                        <Button onClick={handleFilter} size="icon" title="Filterlə">
+                            <Search className="h-4 w-4" />
+                            <span className="sr-only">Filter</span>
+                        </Button>
+                        <Button onClick={resetFilters} size="icon" variant="outline" title="Filterləri sıfırla">
+                            <RotateCcw className="h-4 w-4" />
+                            <span className="sr-only">Filterləri sıfırla</span>
                         </Button>
                     </div>
                 </CardHeader>

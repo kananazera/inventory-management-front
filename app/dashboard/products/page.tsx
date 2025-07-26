@@ -1,979 +1,963 @@
 "use client"
 
 import type React from "react"
-import { Search } from "lucide-react" // Search import edildi
-
+import { Eye, Search, RotateCcw, RefreshCw } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit, Trash2, Check, ChevronsUpDown, Loader2 } from "lucide-react"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+import { Textarea } from "@/components/ui/textarea"
+import { Plus, Edit, Trash2, Loader2 } from "lucide-react" // Calendar icon removed
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Swal from "sweetalert2"
-import { FloatingLabelInput } from "@/components/floating-label-input" // FloatingLabelInput import edildi
+import { FloatingLabelInput } from "@/components/floating-label-input"
 
 interface Product {
-  id: number
-  name: string
-  price: number
-  sku: string | null
-  category_id: number | null
-  brand_id: number | null
-  unit_id: number | null
-  active: boolean
+    id: number
+    name: string
+    sku: string | null
+    description: string | null
+    price: number
+    active: boolean
+    category: ProductCategory | null
+    brand: ProductBrand | null
+    unit: ProductUnit | null
 }
 
-interface Category {
-  id: number
-  name: string
+interface ProductCategory {
+    id: number
+    name: string
 }
 
-interface Brand {
-  id: number
-  name: string
+interface ProductBrand {
+    id: number
+    name: string
 }
 
-interface Unit {
-  id: number
-  name: string
+interface ProductUnit {
+    id: number
+    name: string
 }
 
 interface ApiResponse {
-  message?: string
-  error?: string
-  success?: boolean
-  data?: any
+    message?: string
+    error?: string
+    success?: boolean
+    data?: any
 }
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [loading, setLoading] = useState(true)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [isSubmittingForm, setIsSubmittingForm] = useState(false)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
+    const [products, setProducts] = useState<Product[]>([])
+    const [categories, setCategories] = useState<ProductCategory[]>([])
+    const [brands, setBrands] = useState<ProductBrand[]>([])
+    const [units, setUnits] = useState<ProductUnit[]>([])
+    const [loading, setLoading] = useState(true)
+    const [dialogOpen, setDialogOpen] = useState(false)
+    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+    const [isSubmittingForm, setIsSubmittingForm] = useState(false)
+    const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  // Filter states
-  const [filterName, setFilterName] = useState("")
-  const [filterSku, setFilterSku] = useState("")
-  const [filterCategoryId, setFilterCategoryId] = useState<string>("")
-  const [filterBrandId, setFilterBrandId] = useState<string>("")
-  const [filterUnitId, setFilterUnitId] = useState<string>("")
-  const [filterActive, setFilterActive] = useState<boolean | null>(null)
-  const [filterMinPrice, setFilterMinPrice] = useState("")
-  const [filterMaxPrice, setFilterMaxPrice] = useState("")
+    // Filter states
+    const [filterName, setFilterName] = useState("")
+    const [filterSku, setFilterSku] = useState("")
+    const [filterDescription, setFilterDescription] = useState("")
+    const [filterCategoryId, setFilterCategoryId] = useState<string>("all")
+    const [filterBrandId, setFilterBrandId] = useState<string>("all")
+    const [filterUnitId, setFilterUnitId] = useState<string>("all")
+    const [filterActive, setFilterActive] = useState<string>("all")
+    const [filterMinPrice, setFilterMinPrice] = useState("")
+    const [filterMaxPrice, setFilterMaxPrice] = useState("")
 
-  // Combobox states for filters
-  const [filterCategoryOpen, setFilterCategoryOpen] = useState(false)
-  const [filterBrandOpen, setFilterBrandOpen] = useState(false)
-  const [filterUnitOpen, setFilterUnitOpen] = useState(false)
-
-  // Combobox states for form
-  const [formCategoryOpen, setFormCategoryOpen] = useState(false)
-  const [formBrandOpen, setFormBrandOpen] = useState(false)
-  const [formUnitOpen, setFormUnitOpen] = useState(false)
-
-  const [formData, setFormData] = useState({
-    name: "",
-    price: "",
-    sku: "",
-    category_id: "",
-    brand_id: "",
-    unit_id: "",
-    active: true,
-  })
-
-  const fetchData = useCallback(async (filterParams: Record<string, any> = {}) => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      console.error("Token tapılmadı. Məlumatlar yüklənmədi.")
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const productsRes = await fetch(`http://localhost:8080/api/products/filter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(filterParams),
-      })
-
-      if (!productsRes.ok) {
-        const errorData = await productsRes.json().catch(() => ({ message: "Naməlum xəta" }))
-        console.error("Məhsulları çəkərkən xəta:", productsRes.status, errorData)
-        await Swal.fire({
-          title: "Xəta!",
-          text: errorData.message || errorData.error || `Məhsullar yüklənmədi: Status ${productsRes.status}`,
-          icon: "error",
-          confirmButtonColor: "#ef4444",
-        })
-        setProducts([])
-        setCategories([])
-        setBrands([])
-        setUnits([])
-        return
-      }
-
-      const productsData = await productsRes.json()
-      console.log("Məhsul API cavabı:", productsData)
-      setProducts(Array.isArray(productsData) ? productsData : [])
-
-      const [categoriesRes, brandsRes, unitsRes] = await Promise.all([
-        fetch("http://localhost:8080/api/product-categories", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch("http://localhost:8080/api/product-brands", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch("http://localhost:8080/api/product-units", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ])
-
-      const [categoriesData, brandsData, unitsData] = await Promise.all([
-        categoriesRes.json(),
-        brandsRes.json(),
-        unitsRes.json(),
-      ])
-
-      console.log("Kateqoriya API cavabı (form üçün):", categoriesData)
-      console.log("Brend API cavabı (form üçün):", brandsData)
-      console.log("Vahid API cavabı (form üçün):", unitsData)
-
-      setCategories(Array.isArray(categoriesData) ? categoriesData : [])
-      setBrands(Array.isArray(brandsData) ? brandsData : [])
-      setUnits(Array.isArray(unitsData) ? unitsData : [])
-    } catch (error) {
-      console.error("Məlumatları çəkərkən bağlantı xətası:", error)
-      await Swal.fire({
-        title: "Xəta!",
-        text: "Bağlantı xətası baş verdi",
-        icon: "error",
-        confirmButtonColor: "#ef4444",
-      })
-      setProducts([])
-      setCategories([])
-      setBrands([])
-      setUnits([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData({})
-  }, [fetchData])
-
-  const handleFilter = () => {
-    const filterParams: Record<string, any> = {}
-    if (filterName) filterParams.name = filterName
-    if (filterSku) filterParams.sku = filterSku
-    if (filterCategoryId) filterParams.categoryId = Number.parseInt(filterCategoryId)
-    if (filterBrandId) filterParams.brandId = Number.parseInt(filterBrandId)
-    if (filterUnitId) filterParams.unitId = Number.parseInt(filterUnitId)
-    if (filterActive !== null) filterParams.active = filterActive
-    if (filterMinPrice) filterParams.minPrice = Number.parseFloat(filterMinPrice)
-    if (filterMaxPrice) filterParams.maxPrice = Number.parseFloat(filterMaxPrice)
-
-    fetchData(filterParams)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const token = localStorage.getItem("token")
-    if (!token) return
-
-    setIsSubmittingForm(true)
-
-    try {
-      const url = editingProduct
-          ? `http://localhost:8080/api/products/${editingProduct.id}`
-          : "http://localhost:8080/api/products"
-
-      const method = editingProduct ? "PUT" : "POST"
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          price: Number.parseFloat(formData.price),
-          sku: formData.sku || null,
-          category_id: formData.category_id ? Number.parseInt(formData.category_id) : null,
-          brand_id: formData.brand_id ? Number.parseInt(formData.brand_id) : null,
-          unit_id: formData.unit_id ? Number.parseInt(formData.unit_id) : null,
-          active: formData.active,
-        }),
-      })
-
-      let responseData: ApiResponse = {}
-      try {
-        responseData = await response.json()
-      } catch (e) {
-        responseData = {}
-      }
-
-      if (response.ok) {
-        await Swal.fire({
-          title: "Uğurlu!",
-          text: editingProduct ? "Məhsul uğurla yeniləndi" : "Məhsul uğurla əlavə edildi",
-          icon: "success",
-          confirmButtonColor: "#10b981",
-          timer: 2000,
-          timerProgressBar: true,
-        })
-        setDialogOpen(false)
-        resetForm()
-        fetchData({})
-      } else {
-        await Swal.fire({
-          title: "Xəta!",
-          text: responseData.message || responseData.error || "Əməliyyat uğursuz oldu",
-          icon: "error",
-          confirmButtonColor: "#ef4444",
-        })
-      }
-    } catch (error) {
-      await Swal.fire({
-        title: "Xəta!",
-        text: "Bağlantı xətası baş verdi",
-        icon: "error",
-        confirmButtonColor: "#ef4444",
-      })
-    } finally {
-      setIsSubmittingForm(false)
-    }
-  }
-
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product)
-    setFormData({
-      name: product.name,
-      price: product.price.toString(),
-      sku: product.sku || "",
-      category_id: product.category_id ? product.category_id.toString() : "",
-      brand_id: product.brand_id ? product.brand_id.toString() : "",
-      unit_id: product.unit_id ? product.unit_id.toString() : "",
-      active: product.active,
-    })
-    setDialogOpen(true)
-  }
-
-  const handleDelete = async (id: number) => {
-    const result = await Swal.fire({
-      title: "Əminsiniz?",
-      text: "Bu məhsulu silmək istədiyinizə əminsiniz? Bu əməliyyat geri alına bilməz!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Bəli, sil!",
-      cancelButtonText: "Ləğv et",
-      reverseButtons: true,
+    const [formData, setFormData] = useState({
+        name: "",
+        sku: "",
+        description: "",
+        price: "",
+        categoryId: "none",
+        brandId: "none",
+        unitId: "none",
+        active: true,
     })
 
-    if (!result.isConfirmed) return
+    const [isClient, setIsClient] = useState(false)
+    const [hasToken, setHasToken] = useState(false)
 
-    const token = localStorage.getItem("token")
-    if (!token) return
+    // Generate unique SKU
+    const generateSKU = () => {
+        let result = ""
+        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        const charactersLength = characters.length
+        for (let i = 0; i < 10; i++) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength))
+        }
+        return result
+    }
 
-    setDeletingId(id)
-
-    try {
-      const response = await fetch(`http://localhost:8080/api/products/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        await Swal.fire({
-          title: "Silindi!",
-          text: "Məhsul uğurla silindi",
-          icon: "success",
-          confirmButtonColor: "#10b981",
-          timer: 2000,
-          timerProgressBar: true,
-        })
-        fetchData({})
-      } else {
-        let responseData: ApiResponse = {}
-        try {
-          responseData = await response.json()
-        } catch (e) {
-          responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
+    const fetchData = useCallback(async (filterParams: Record<string, any> = {}) => {
+        if (typeof window === "undefined") {
+            setLoading(false)
+            return
         }
 
-        await Swal.fire({
-          title: "Xəta!",
-          text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
-          icon: "error",
-          confirmButtonColor: "#ef4444",
-        })
-      }
-    } catch (error) {
-      await Swal.fire({
-        title: "Xəta!",
-        text: "Bağlantı xətası baş verdi",
-        icon: "error",
-        confirmButtonColor: "#ef4444",
-      })
-    } finally {
-      setDeletingId(null)
+        const token = localStorage.getItem("token")
+        if (!token) {
+            console.error("Token tapılmadı. Məlumatlar yüklənmədi.")
+            setHasToken(false)
+            setLoading(false)
+            return
+        }
+
+        setHasToken(true)
+        setLoading(true)
+
+        try {
+            const productsRes = await fetch(`http://localhost:8080/api/products/filter`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(filterParams),
+            })
+
+            if (!productsRes.ok) {
+                const errorData = await productsRes.json().catch(() => ({ message: "Naməlum xəta" }))
+                console.error("Məhsulları çəkərkən xəta:", productsRes.status, errorData)
+                await Swal.fire({
+                    title: "Xəta!",
+                    text: errorData.message || errorData.error || `Məhsullar yüklənmədi: Status ${productsRes.status}`,
+                    icon: "error",
+                    confirmButtonColor: "#ef4444",
+                })
+                setProducts([])
+                setCategories([])
+                setBrands([])
+                setUnits([])
+                return
+            }
+
+            const productsData = await productsRes.json()
+            console.log("Məhsul API cavabı:", productsData)
+            setProducts(Array.isArray(productsData) ? productsData : [])
+
+            const [categoriesRes, brandsRes, unitsRes] = await Promise.all([
+                fetch("http://localhost:8080/api/product-categories", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                fetch("http://localhost:8080/api/product-brands", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                fetch("http://localhost:8080/api/product-units", {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ])
+
+            const [categoriesData, brandsData, unitsData] = await Promise.all([
+                categoriesRes.json(),
+                brandsRes.json(),
+                unitsRes.json(),
+            ])
+
+            setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+            setBrands(Array.isArray(brandsData) ? brandsData : [])
+            setUnits(Array.isArray(unitsData) ? unitsData : [])
+        } catch (error) {
+            console.error("Məlumatları çəkərkən bağlantı xətası:", error)
+            await Swal.fire({
+                title: "Xəta!",
+                text: "Bağlantı xətası baş verdi",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+            })
+            setProducts([])
+            setCategories([])
+            setBrands([])
+            setUnits([])
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        setIsClient(true)
+        const token = localStorage.getItem("token")
+        setHasToken(!!token)
+    }, [])
+
+    useEffect(() => {
+        if (isClient && hasToken) {
+            fetchData({})
+        }
+    }, [isClient, hasToken, fetchData])
+
+    const handleFilter = () => {
+        const filterParams: Record<string, any> = {}
+        if (filterName) filterParams.name = filterName
+        if (filterSku) filterParams.sku = filterSku
+        if (filterDescription) filterParams.description = filterDescription
+        if (filterCategoryId !== "all") filterParams.categoryId = Number.parseInt(filterCategoryId)
+        if (filterBrandId !== "all") filterParams.brandId = Number.parseInt(filterBrandId)
+        if (filterUnitId !== "all") filterParams.unitId = Number.parseInt(filterUnitId)
+        if (filterActive === "true") filterParams.active = true
+        if (filterActive === "false") filterParams.active = false
+        if (filterMinPrice) filterParams.minPrice = Number.parseFloat(filterMinPrice)
+        if (filterMaxPrice) filterParams.maxPrice = Number.parseFloat(filterMaxPrice)
+
+        fetchData(filterParams)
     }
-  }
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      price: "",
-      sku: "",
-      category_id: "",
-      brand_id: "",
-      unit_id: "",
-      active: true,
-    })
-    setEditingProduct(null)
-    setFormCategoryOpen(false)
-    setFormBrandOpen(false)
-    setFormUnitOpen(false)
-  }
+    const resetFilters = () => {
+        setFilterName("")
+        setFilterSku("")
+        setFilterDescription("")
+        setFilterCategoryId("all")
+        setFilterBrandId("all")
+        setFilterUnitId("all")
+        setFilterActive("all")
+        setFilterMinPrice("")
+        setFilterMaxPrice("")
+        fetchData({})
+    }
 
-  const getCategoryName = (categoryId: number | null) => {
-    if (!categoryId) return "Seçilməyib"
-    const category = categories.find((c) => c.id === categoryId)
-    return category ? category.name : "Bilinmir"
-  }
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (typeof window === "undefined") return
 
-  const getBrandName = (brandId: number | null) => {
-    if (!brandId) return "Seçilməyib"
-    const brand = brands.find((b) => b.id === brandId)
-    return brand ? brand.name : "Bilinmir"
-  }
+        const token = localStorage.getItem("token")
+        if (!token) return
 
-  const getUnitName = (unitId: number | null) => {
-    if (!unitId) return "Seçilməyib"
-    const unit = units.find((u) => u.id === unitId)
-    return unit ? unit.name : "Bilinmir"
-  }
+        setIsSubmittingForm(true)
 
-  return (
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Məhsullar</h1>
-            <p className="mt-2 text-gray-600">Məhsulları idarə edin</p>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="mr-2 h-4 w-4" />
-                Yeni məhsul
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingProduct ? "Məhsulu redaktə et" : "Yeni məhsul əlavə et"}</DialogTitle>
-                <DialogDescription>Məhsul məlumatlarını daxil edin</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid gap-6 py-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <FloatingLabelInput
-                          id="product-name"
-                          label="Ad *"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          required
-                          disabled={isSubmittingForm}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <FloatingLabelInput
-                          id="product-price"
-                          label="Qiymət *"
-                          type="number"
-                          step="0.01"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                          required
-                          disabled={isSubmittingForm}
-                      />
-                    </div>
-                  </div>
+        try {
+            const url = editingProduct
+                ? `http://localhost:8080/api/products/${editingProduct.id}`
+                : "http://localhost:8080/api/products"
+            const method = editingProduct ? "PUT" : "POST"
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <FloatingLabelInput
-                          id="product-sku"
-                          label="SKU"
-                          value={formData.sku}
-                          onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                          disabled={isSubmittingForm}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Kateqoriya</Label>
-                      <Popover open={formCategoryOpen} onOpenChange={setFormCategoryOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={formCategoryOpen}
-                              className="w-full justify-between bg-transparent"
-                              disabled={isSubmittingForm}
-                          >
-                            {formData.category_id
-                                ? categories.find((category) => category.id.toString() === formData.category_id)?.name
-                                : "Kateqoriya seçin..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Kateqoriya axtar..." />
-                            <CommandList>
-                              <CommandEmpty>Kateqoriya tapılmadı.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem
-                                    value=""
-                                    onSelect={() => {
-                                      setFormData({ ...formData, category_id: "" })
-                                      setFormCategoryOpen(false)
-                                    }}
-                                >
-                                  <Check
-                                      className={cn(
-                                          "mr-2 h-4 w-4",
-                                          formData.category_id === "" ? "opacity-100" : "opacity-0",
-                                      )}
-                                  />
-                                  Seçim yoxdur
-                                </CommandItem>
-                                {categories.map((category) => (
-                                    <CommandItem
-                                        key={category.id}
-                                        value={category.name}
-                                        onSelect={() => {
-                                          setFormData({ ...formData, category_id: category.id.toString() })
-                                          setFormCategoryOpen(false)
-                                        }}
-                                    >
-                                      <Check
-                                          className={cn(
-                                              "mr-2 h-4 w-4",
-                                              formData.category_id === category.id.toString() ? "opacity-100" : "opacity-0",
-                                          )}
-                                      />
-                                      {category.name}
-                                    </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
+            const requestBody = {
+                name: formData.name,
+                sku: formData.sku || null,
+                description: formData.description || null,
+                price: Number.parseFloat(formData.price),
+                categoryId: formData.categoryId !== "none" ? Number.parseInt(formData.categoryId) : null,
+                brandId: formData.brandId !== "none" ? Number.parseInt(formData.brandId) : null,
+                unitId: formData.unitId !== "none" ? Number.parseInt(formData.unitId) : null,
+                active: formData.active,
+            }
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Brend</Label>
-                      <Popover open={formBrandOpen} onOpenChange={setFormBrandOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={formBrandOpen}
-                              className="w-full justify-between bg-transparent"
-                              disabled={isSubmittingForm}
-                          >
-                            {formData.brand_id
-                                ? brands.find((brand) => brand.id.toString() === formData.brand_id)?.name
-                                : "Brend seçin..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Brend axtar..." />
-                            <CommandList>
-                              <CommandEmpty>Brend tapılmadı.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem
-                                    value=""
-                                    onSelect={() => {
-                                      setFormData({ ...formData, brand_id: "" })
-                                      setFormBrandOpen(false)
-                                    }}
-                                >
-                                  <Check
-                                      className={cn("mr-2 h-4 w-4", formData.brand_id === "" ? "opacity-100" : "opacity-0")}
-                                  />
-                                  Seçim yoxdur
-                                </CommandItem>
-                                {brands.map((brand) => (
-                                    <CommandItem
-                                        key={brand.id}
-                                        value={brand.name}
-                                        onSelect={() => {
-                                          setFormData({ ...formData, brand_id: brand.id.toString() })
-                                          setFormBrandOpen(false)
-                                        }}
-                                    >
-                                      <Check
-                                          className={cn(
-                                              "mr-2 h-4 w-4",
-                                              formData.brand_id === brand.id.toString() ? "opacity-100" : "opacity-0",
-                                          )}
-                                      />
-                                      {brand.name}
-                                    </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(requestBody),
+            })
 
-                    <div className="space-y-2">
-                      <Label>Ölçü vahidi</Label>
-                      <Popover open={formUnitOpen} onOpenChange={setFormUnitOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={formUnitOpen}
-                              className="w-full justify-between bg-transparent"
-                              disabled={isSubmittingForm}
-                          >
-                            {formData.unit_id
-                                ? units.find((unit) => unit.id.toString() === formData.unit_id)?.name
-                                : "Vahid seçin..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Vahid axtar..." />
-                            <CommandList>
-                              <CommandEmpty>Vahid tapılmadı.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem
-                                    value=""
-                                    onSelect={() => {
-                                      setFormData({ ...formData, unit_id: "" })
-                                      setFormUnitOpen(false)
-                                    }}
-                                >
-                                  <Check
-                                      className={cn("mr-2 h-4 w-4", formData.unit_id === "" ? "opacity-100" : "opacity-0")}
-                                  />
-                                  Seçim yoxdur
-                                </CommandItem>
-                                {units.map((unit) => (
-                                    <CommandItem
-                                        key={unit.id}
-                                        value={unit.name}
-                                        onSelect={() => {
-                                          setFormData({ ...formData, unit_id: unit.id.toString() })
-                                          setFormUnitOpen(false)
-                                        }}
-                                    >
-                                      <Check
-                                          className={cn(
-                                              "mr-2 h-4 w-4",
-                                              formData.unit_id === unit.id.toString() ? "opacity-100" : "opacity-0",
-                                          )}
-                                      />
-                                      {unit.name}
-                                    </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
+            let responseData: ApiResponse = {}
+            try {
+                responseData = await response.json()
+            } catch (e) {
+                responseData = {}
+            }
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                        id="active"
-                        checked={formData.active}
-                        onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-                        disabled={isSubmittingForm}
-                    />
-                    <Label htmlFor="active">Aktiv</Label>
-                  </div>
+            if (response.ok) {
+                await Swal.fire({
+                    title: "Uğurlu!",
+                    text: editingProduct ? "Məhsul uğurla yeniləndi" : "Məhsul uğurla əlavə edildi",
+                    icon: "success",
+                    confirmButtonColor: "#10b981",
+                    timer: 2000,
+                    timerProgressBar: true,
+                })
+                setDialogOpen(false)
+                resetForm()
+                // Refresh all data including categories, brands, and units
+                await fetchData({})
+            } else {
+                await Swal.fire({
+                    title: "Xəta!",
+                    text: responseData.message || responseData.error || "Əməliyyat uğursuz oldu",
+                    icon: "error",
+                    confirmButtonColor: "#ef4444",
+                })
+            }
+        } catch (error) {
+            await Swal.fire({
+                title: "Xəta!",
+                text: "Bağlantı xətası baş verdi",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+            })
+        } finally {
+            setIsSubmittingForm(false)
+        }
+    }
+
+    const fetchProductById = useCallback(async (id: number): Promise<Product | null> => {
+        if (typeof window === "undefined") return null
+        const token = localStorage.getItem("token")
+        if (!token) return null
+
+        try {
+            const response = await fetch(`http://localhost:8080/api/products/${id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            if (response.ok) {
+                return await response.json()
+            } else {
+                console.error(`Failed to fetch product with ID ${id}:`, response.status)
+                return null
+            }
+        } catch (error) {
+            console.error(`Error fetching product with ID ${id}:`, error)
+            return null
+        }
+    }, [])
+
+    const handleEdit = async (product: Product) => {
+        const fetchedProduct = await fetchProductById(product.id)
+        if (fetchedProduct) {
+            setEditingProduct(fetchedProduct)
+            setFormData({
+                name: fetchedProduct.name,
+                sku: fetchedProduct.sku || "",
+                description: fetchedProduct.description || "",
+                price: fetchedProduct.price.toString(),
+                categoryId: fetchedProduct.category ? fetchedProduct.category.id.toString() : "none",
+                brandId: fetchedProduct.brand ? fetchedProduct.brand.id.toString() : "none",
+                unitId: fetchedProduct.unit ? fetchedProduct.unit.id.toString() : "none",
+                active: fetchedProduct.active,
+            })
+            setDialogOpen(true)
+        } else {
+            await Swal.fire({
+                title: "Xəta!",
+                text: "Məhsul məlumatları yüklənə bilmədi.",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+            })
+        }
+    }
+
+    const handleViewDetails = async (product: Product) => {
+        const fetchedProduct = await fetchProductById(product.id)
+        if (fetchedProduct) {
+            setSelectedProduct(fetchedProduct)
+            setDetailsDialogOpen(true)
+        } else {
+            await Swal.fire({
+                title: "Xəta!",
+                text: "Məhsul məlumatları yüklənə bilmədi.",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+            })
+        }
+    }
+
+    const handleDelete = async (id: number) => {
+        const result = await Swal.fire({
+            title: "Əminsiniz?",
+            text: "Bu məhsulu silmək istədiyinizə əminsiniz? Bu əməliyyat geri alına bilməz!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#ef4444",
+            cancelButtonColor: "#6b7280",
+            confirmButtonText: "Bəli, sil!",
+            cancelButtonText: "Ləğv et",
+            reverseButtons: true,
+        })
+
+        if (!result.isConfirmed) return
+
+        if (typeof window === "undefined") return
+        const token = localStorage.getItem("token")
+        if (!token) return
+
+        setDeletingId(id)
+
+        try {
+            const response = await fetch(`http://localhost:8080/api/products/${id}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            if (response.ok) {
+                await Swal.fire({
+                    title: "Silindi!",
+                    text: "Məhsul uğurla silindi",
+                    icon: "success",
+                    confirmButtonColor: "#10b981",
+                    timer: 2000,
+                    timerProgressBar: true,
+                })
+                fetchData({})
+            } else {
+                let responseData: ApiResponse = {}
+                try {
+                    responseData = await response.json()
+                } catch (e) {
+                    responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
+                }
+                await Swal.fire({
+                    title: "Xəta!",
+                    text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
+                    icon: "error",
+                    confirmButtonColor: "#ef4444",
+                })
+            }
+        } catch (error) {
+            await Swal.fire({
+                title: "Xəta!",
+                text: "Bağlantı xətası baş verdi",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+            })
+        } finally {
+            setDeletingId(null)
+        }
+    }
+
+    const resetForm = () => {
+        setFormData({
+            name: "",
+            sku: generateSKU(), // Auto-generate SKU for new products
+            description: "",
+            price: "",
+            categoryId: "none",
+            brandId: "none",
+            unitId: "none",
+            active: true,
+        })
+        setEditingProduct(null)
+    }
+
+    if (!isClient) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Yüklənir...</span>
+            </div>
+        )
+    }
+
+    if (!hasToken) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Card className="w-96">
+                    <CardContent className="p-6 text-center">
+                        <h2 className="text-xl font-semibold mb-2">Giriş Tələb Olunur</h2>
+                        <p className="mt-2 text-gray-600">Bu səhifəyə daxil olmaq üçün giriş etməlisiniz.</p>
+                        <Button onClick={() => (window.location.href = "/login")}>Giriş et</Button>
+                    </CardContent>
+                </Card>
+            </div>
+        )
+    }
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Məhsullar</h1>
+                    <p className="mt-2 text-gray-600">Məhsulları idarə edin</p>
                 </div>
-                <DialogFooter className="gap-2">
-                  <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setDialogOpen(false)}
-                      disabled={isSubmittingForm}
-                  >
-                    Ləğv et
-                  </Button>
-                  <Button type="submit" disabled={isSubmittingForm}>
-                    {isSubmittingForm && <Loader2 className="mr-2 h-6 w-6 animate-spin text-black" />}
-                    Əlavə et
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button onClick={resetForm}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Yeni məhsul
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>{editingProduct ? "Məhsulu redaktə et" : "Yeni məhsul əlavə et"}</DialogTitle>
+                            <DialogDescription>Məhsul məlumatlarını daxil edin</DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleSubmit}>
+                            <div className="grid gap-6 py-4">
+                                {/* Basic Information - 50% name, 25% price, 25% SKU */}
+                                <div className="grid grid-cols-12 gap-4">
+                                    <div className="col-span-6 space-y-2">
+                                        <FloatingLabelInput
+                                            id="product-name"
+                                            label="Ad *"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            required
+                                            disabled={isSubmittingForm}
+                                        />
+                                    </div>
+                                    <div className="col-span-3 space-y-2">
+                                        <FloatingLabelInput
+                                            id="product-price"
+                                            label="Qiymət *"
+                                            type="number"
+                                            step="0.01"
+                                            value={formData.price}
+                                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                            required
+                                            disabled={isSubmittingForm}
+                                        />
+                                    </div>
+                                    <div className="col-span-3 space-y-2">
+                                        <div className="relative">
+                                            <FloatingLabelInput
+                                                id="product-sku"
+                                                label="SKU"
+                                                value={formData.sku}
+                                                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                                                disabled={isSubmittingForm}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="absolute right-1 top-1 h-8 w-8 p-0 bg-transparent"
+                                                onClick={() => setFormData({ ...formData, sku: generateSKU() })}
+                                                disabled={isSubmittingForm}
+                                                title="Yeni SKU generasiya et"
+                                            >
+                                                <RefreshCw className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
 
-        <Card>
-          <CardHeader>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <FloatingLabelInput
-                    id="filterName"
-                    label="Ad"
-                    value={filterName}
-                    onChange={(e) => setFilterName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <FloatingLabelInput
-                    id="filterSku"
-                    label="SKU"
-                    value={filterSku}
-                    onChange={(e) => setFilterSku(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <FloatingLabelInput
-                    id="filterMinPrice"
-                    label="Min qiymət"
-                    type="number"
-                    step="0.01"
-                    value={filterMinPrice}
-                    onChange={(e) => setFilterMinPrice(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <FloatingLabelInput
-                    id="filterMaxPrice"
-                    label="Max qiymət"
-                    type="number"
-                    step="0.01"
-                    value={filterMaxPrice}
-                    onChange={(e) => setFilterMaxPrice(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Kateqoriya</Label>
-                <Popover open={filterCategoryOpen} onOpenChange={setFilterCategoryOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={filterCategoryOpen}
-                        className="w-full justify-between bg-transparent"
-                    >
-                      {filterCategoryId
-                          ? categories.find((category) => category.id.toString() === filterCategoryId)?.name
-                          : "Kateqoriya seçin..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Kateqoriya axtar..." />
-                      <CommandList>
-                        <CommandEmpty>Kateqoriya tapılmadı.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                              value=""
-                              onSelect={() => {
-                                setFilterCategoryId("")
-                                setFilterCategoryOpen(false)
-                              }}
-                          >
-                            <Check
-                                className={cn("mr-2 h-4 w-4", filterCategoryId === "" ? "opacity-100" : "opacity-0")}
-                            />
-                            Hamısı
-                          </CommandItem>
-                          {categories.map((category) => (
-                              <CommandItem
-                                  key={category.id}
-                                  value={category.name}
-                                  onSelect={() => {
-                                    setFilterCategoryId(category.id.toString())
-                                    setFilterCategoryOpen(false)
-                                  }}
-                              >
-                                <Check
-                                    className={cn(
-                                        "mr-2 h-4 w-4",
-                                        filterCategoryId === category.id.toString() ? "opacity-100" : "opacity-0",
-                                    )}
-                                />
-                                {category.name}
-                              </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label>Brend</Label>
-                <Popover open={filterBrandOpen} onOpenChange={setFilterBrandOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={filterBrandOpen}
-                        className="w-full justify-between bg-transparent"
-                    >
-                      {filterBrandId
-                          ? brands.find((brand) => brand.id.toString() === filterBrandId)?.name
-                          : "Brend seçin..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Brend axtar..." />
-                      <CommandList>
-                        <CommandEmpty>Brend tapılmadı.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                              value=""
-                              onSelect={() => {
-                                setFilterBrandId("")
-                                setFilterBrandOpen(false)
-                              }}
-                          >
-                            <Check className={cn("mr-2 h-4 w-4", filterBrandId === "" ? "opacity-100" : "opacity-0")} />
-                            Hamısı
-                          </CommandItem>
-                          {brands.map((brand) => (
-                              <CommandItem
-                                  key={brand.id}
-                                  value={brand.name}
-                                  onSelect={() => {
-                                    setFilterBrandId(brand.id.toString())
-                                    setFilterBrandOpen(false)
-                                  }}
-                              >
-                                <Check
-                                    className={cn(
-                                        "mr-2 h-4 w-4",
-                                        filterBrandId === brand.id.toString() ? "opacity-100" : "opacity-0",
-                                    )}
-                                />
-                                {brand.name}
-                              </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label>Ölçü vahidi</Label>
-                <Popover open={filterUnitOpen} onOpenChange={setFilterUnitOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={filterUnitOpen}
-                        className="w-full justify-between bg-transparent"
-                    >
-                      {filterUnitId ? units.find((unit) => unit.id.toString() === filterUnitId)?.name : "Vahid seçin..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Vahid axtar..." />
-                      <CommandList>
-                        <CommandEmpty>Vahid tapılmadı.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                              value=""
-                              onSelect={() => {
-                                setFilterUnitId("")
-                                setFilterUnitOpen(false)
-                              }}
-                          >
-                            <Check className={cn("mr-2 h-4 w-4", filterUnitId === "" ? "opacity-100" : "opacity-0")} />
-                            Hamısı
-                          </CommandItem>
-                          {units.map((unit) => (
-                              <CommandItem
-                                  key={unit.id}
-                                  value={unit.name}
-                                  onSelect={() => {
-                                    setFilterUnitId(unit.id.toString())
-                                    setFilterUnitOpen(false)
-                                  }}
-                              >
-                                <Check
-                                    className={cn(
-                                        "mr-2 h-4 w-4",
-                                        filterUnitId === unit.id.toString() ? "opacity-100" : "opacity-0",
-                                    )}
-                                />
-                                {unit.name}
-                              </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between bg-transparent">
-                      {filterActive === true ? "Aktiv" : filterActive === false ? "Deaktiv" : "Hamısı"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandList>
-                        <CommandEmpty>Status tapılmadı.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem value="all" onSelect={() => setFilterActive(null)}>
-                            <Check className={cn("mr-2 h-4 w-4", filterActive === null ? "opacity-100" : "opacity-0")} />
-                            Hamısı
-                          </CommandItem>
-                          <CommandItem value="active" onSelect={() => setFilterActive(true)}>
-                            <Check className={cn("mr-2 h-4 w-4", filterActive === true ? "opacity-100" : "opacity-0")} />
-                            Aktiv
-                          </CommandItem>
-                          <CommandItem value="inactive" onSelect={() => setFilterActive(false)}>
-                            <Check className={cn("mr-2 h-4 w-4", filterActive === false ? "opacity-100" : "opacity-0")} />
-                            Deaktiv
-                          </CommandItem>
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                                {/* Description */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="product-description">Təsvir</Label>
+                                    <Textarea
+                                        id="product-description"
+                                        placeholder="Məhsul təsvirini daxil edin..."
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        disabled={isSubmittingForm}
+                                        rows={3}
+                                    />
+                                </div>
+
+                                {/* Category, Brand, Unit */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Kateqoriya</Label>
+                                        <Select
+                                            value={formData.categoryId}
+                                            onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                                            disabled={isSubmittingForm}
+                                        >
+                                            <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                                <SelectValue placeholder="Kateqoriya seçin..." />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[200px] overflow-y-auto">
+                                                <SelectItem value="none">Seçim yoxdur</SelectItem>
+                                                {categories.map((category) => (
+                                                    <SelectItem key={category.id} value={category.id.toString()}>
+                                                        {category.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Brend</Label>
+                                        <Select
+                                            value={formData.brandId}
+                                            onValueChange={(value) => setFormData({ ...formData, brandId: value })}
+                                            disabled={isSubmittingForm}
+                                        >
+                                            <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                                <SelectValue placeholder="Brend seçin..." />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[200px] overflow-y-auto">
+                                                <SelectItem value="none">Seçim yoxdur</SelectItem>
+                                                {brands.map((brand) => (
+                                                    <SelectItem key={brand.id} value={brand.id.toString()}>
+                                                        {brand.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Ölçü vahidi</Label>
+                                        <Select
+                                            value={formData.unitId}
+                                            onValueChange={(value) => setFormData({ ...formData, unitId: value })}
+                                            disabled={isSubmittingForm}
+                                        >
+                                            <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                                <SelectValue placeholder="Vahid seçin..." />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[200px] overflow-y-auto">
+                                                <SelectItem value="none">Seçim yoxdur</SelectItem>
+                                                {units.map((unit) => (
+                                                    <SelectItem key={unit.id} value={unit.id.toString()}>
+                                                        {unit.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                {/* Active Status */}
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        id="active"
+                                        checked={formData.active}
+                                        onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+                                        disabled={isSubmittingForm}
+                                    />
+                                    <Label htmlFor="active">Aktiv</Label>
+                                </div>
+                            </div>
+                            <DialogFooter className="gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setDialogOpen(false)}
+                                    disabled={isSubmittingForm}
+                                >
+                                    Ləğv et
+                                </Button>
+                                <Button type="submit" disabled={isSubmittingForm}>
+                                    {isSubmittingForm && <Loader2 className="mr-2 h-6 w-6 animate-spin text-black" />}
+                                    {editingProduct ? "Yenilə" : "Əlavə et"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </div>
-            <div className="flex justify-end mt-4">
-              <Button onClick={handleFilter} size="icon">
-                {" "}
-                {/* size="icon" əlavə edildi */}
-                <Search className="h-4 w-4" /> {/* İkon əlavə edildi */}
-                <span className="sr-only">Filterlə</span> {/* Əlçatanlıq üçün əlavə edildi */}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ad</TableHead>
-                    <TableHead>Qiymət</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Kateqoriya</TableHead>
-                    <TableHead>Brend</TableHead>
-                    <TableHead>Ölçü vahidi</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Əməliyyatlar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.price} ₼</TableCell>
-                        <TableCell>{product.sku || "N/A"}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {getCategoryName(product.category_id)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {getBrandName(product.brand_id)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {getUnitName(product.unit_id)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={product.active ? "default" : "secondary"}>
-                            {product.active ? "Aktiv" : "Deaktiv"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
+
+            {/* Product Details Modal */}
+            <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+                <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Məhsul Təfərrüatları</DialogTitle>
+                        <DialogDescription>{selectedProduct?.name} məhsulunun bütün məlumatları</DialogDescription>
+                    </DialogHeader>
+                    {selectedProduct && (
+                        <div className="grid gap-6 py-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Card>
+                                    <CardHeader>
+                                        <h3 className="text-lg font-semibold">Əsas Məlumatlar</h3>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">ID</Label>
+                                            <p className="text-sm font-medium">{selectedProduct.id}</p>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Ad</Label>
+                                            <p className="text-sm font-medium">{selectedProduct.name}</p>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">SKU</Label>
+                                            <p className="text-sm font-medium">{selectedProduct.sku || "N/A"}</p>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Qiymət</Label>
+                                            <p className="text-lg font-bold text-green-600">{selectedProduct.price}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            {" "}
+                                            {/* Added space-y-1 for spacing */}
+                                            <Label className="text-sm font-medium text-gray-500">Status</Label>
+                                            <Badge variant={selectedProduct.active ? "default" : "secondary"} className="w-fit">
+                                                {" "}
+                                                {/* Removed mt-1, block */}
+                                                {selectedProduct.active ? "Aktiv" : "Deaktiv"}
+                                            </Badge>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            <Card>
+                                <CardHeader>
+                                    <h3 className="text-lg font-semibold">Təsvir</h3>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm text-gray-700">{selectedProduct.description || "Təsvir əlavə edilməyib"}</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <h3 className="text-lg font-semibold">Kateqoriya Məlumatları</h3>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Kateqoriya</Label>
+                                            <Badge variant="outline" className="mt-1 block w-fit">
+                                                {selectedProduct.category?.name || "Seçilməyib"}
+                                            </Badge>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Brend</Label>
+                                            <Badge variant="outline" className="mt-1 block w-fit">
+                                                {selectedProduct.brand?.name || "Seçilməyib"}
+                                            </Badge>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Ölçü Vahidi</Label>
+                                            <Badge variant="outline" className="mt-1 block w-fit">
+                                                {selectedProduct.unit?.name || "Seçilməyib"}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDetailsDialogOpen(false)}>
+                            Bağla
+                        </Button>
+                        {selectedProduct && (
                             <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEdit(product)}
-                                disabled={deletingId !== null}
+                                onClick={() => {
+                                    setDetailsDialogOpen(false)
+                                    handleEdit(selectedProduct)
+                                }}
                             >
-                              <Edit className="h-4 w-4" />
+                                <Edit className="mr-2 h-4 w-4" />
+                                Redaktə et
                             </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDelete(product.id)}
-                                className="text-red-600 hover:text-red-700"
-                                disabled={deletingId === product.id}
-                            >
-                              {deletingId === product.id ? (
-                                  <Loader2 className="h-6 w-6 animate-spin text-black" />
-                              ) : (
-                                  <Trash2 className="h-4 w-4" />
-                              )}
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Filter Section */}
+            <Card>
+                <CardHeader>
+                    <div className="space-y-4">
+                        {/* First row - Text inputs */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                            <div className="space-y-2">
+                                <FloatingLabelInput
+                                    id="filterName"
+                                    label="Ad"
+                                    value={filterName}
+                                    onChange={(e) => setFilterName(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FloatingLabelInput
+                                    id="filterSku"
+                                    label="SKU"
+                                    value={filterSku}
+                                    onChange={(e) => setFilterSku(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FloatingLabelInput
+                                    id="filterDescription"
+                                    label="Təsvir"
+                                    value={filterDescription}
+                                    onChange={(e) => setFilterDescription(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FloatingLabelInput
+                                    id="filterMinPrice"
+                                    label="Ən az qiymət"
+                                    type="number"
+                                    step="0.01"
+                                    value={filterMinPrice}
+                                    onChange={(e) => setFilterMinPrice(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FloatingLabelInput
+                                    id="filterMaxPrice"
+                                    label="Ən çox qiymət"
+                                    type="number"
+                                    step="0.01"
+                                    value={filterMaxPrice}
+                                    onChange={(e) => setFilterMaxPrice(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Second row - Select inputs */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <Label>Kateqoriya</Label>
+                                <Select value={filterCategoryId} onValueChange={setFilterCategoryId}>
+                                    <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                        <SelectValue placeholder="Kateqoriya seçin..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                                        <SelectItem value="all">Hamısı</SelectItem>
+                                        {categories.map((category) => (
+                                            <SelectItem key={category.id} value={category.id.toString()}>
+                                                {category.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Brend</Label>
+                                <Select value={filterBrandId} onValueChange={setFilterBrandId}>
+                                    <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                        <SelectValue placeholder="Brend seçin..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                                        <SelectItem value="all">Hamısı</SelectItem>
+                                        {brands.map((brand) => (
+                                            <SelectItem key={brand.id} value={brand.id.toString()}>
+                                                {brand.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Ölçü vahidi</Label>
+                                <Select value={filterUnitId} onValueChange={setFilterUnitId}>
+                                    <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                        <SelectValue placeholder="Vahid seçin..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                                        <SelectItem value="all">Hamısı</SelectItem>
+                                        {units.map((unit) => (
+                                            <SelectItem key={unit.id} value={unit.id.toString()}>
+                                                {unit.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Status</Label>
+                                <Select value={filterActive} onValueChange={setFilterActive}>
+                                    <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                        <SelectValue placeholder="Status seçin..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                                        <SelectItem value="all">Hamısı</SelectItem>
+                                        <SelectItem value="true">Aktiv</SelectItem>
+                                        <SelectItem value="false">Deaktiv</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        {/* Filter and Reset buttons */}
+                        <div className="flex justify-end gap-2">
+                            <Button onClick={handleFilter} size="icon" title="Filterlə">
+                                <Search className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-  )
+                            <Button onClick={resetFilters} size="icon" variant="outline" title="Filterləri sıfırla">
+                                <RotateCcw className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Ad</TableHead>
+                                    <TableHead>SKU</TableHead>
+                                    <TableHead>Qiymət</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Əməliyyatlar</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-8">
+                                            {" "}
+                                            {/* colSpan adjusted */}
+                                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                                            <p className="mt-2 text-sm text-gray-500">Məlumatlar yüklənir...</p>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : products.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-8">
+                                            {" "}
+                                            {/* colSpan adjusted */}
+                                            <p className="text-sm text-gray-500">Heç bir məhsul tapılmadı</p>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    products.map((product) => (
+                                        <TableRow key={product.id}>
+                                            <TableCell className="font-medium">{product.name}</TableCell>
+                                            <TableCell>{product.sku || "N/A"}</TableCell>
+                                            <TableCell className="font-semibold text-green-600">{product.price}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={product.active ? "default" : "secondary"}>
+                                                    {product.active ? "Aktiv" : "Deaktiv"}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex space-x-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleViewDetails(product)}
+                                                        disabled={deletingId !== null}
+                                                        title="Təfərrüatları gör"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleEdit(product)}
+                                                        disabled={deletingId !== null}
+                                                        title="Redaktə et"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleDelete(product.id)}
+                                                        className="text-red-600 hover:text-red-700"
+                                                        disabled={deletingId === product.id}
+                                                        title="Sil"
+                                                    >
+                                                        {deletingId === product.id ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    )
 }

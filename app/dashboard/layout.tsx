@@ -10,7 +10,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Menu, ShoppingBag, Package, Tags, Layers, Scale, LogOut, Home } from "lucide-react"
+import {Menu, ShoppingBag, Package, Tags, Layers, Scale, LogOut, Home, Currency, Settings, Users} from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,10 +21,13 @@ import {
 
 const navigation = [
     { name: "Ana səhifə", href: "/dashboard", icon: Home },
+    { name: "İstifadəçilər", href: "/dashboard/users", icon: Users },
     { name: "Məhsullar", href: "/dashboard/products", icon: Package },
     { name: "Kateqoriyalar", href: "/dashboard/product-categories", icon: Tags },
     { name: "Brendlər", href: "/dashboard/product-brands", icon: Layers }, // Dəyişiklik burada
     { name: "Ölçü vahidləri", href: "/dashboard/product-units", icon: Scale }, // Dəyişiklik burada
+    { name: "Valyutalar", href: "/dashboard/currencies", icon: Currency }, // Dəyişiklik burada
+    { name: "Ayarlar", href: "/dashboard/settings", icon: Settings }, // Dəyişiklik burada
 ]
 
 export default function DashboardLayout({
