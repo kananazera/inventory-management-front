@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { Eye, Search, RotateCcw, RefreshCw } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
@@ -19,7 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Loader2 } from "lucide-react" // Calendar icon removed
+import { Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Swal from "sweetalert2"
 import { FloatingLabelInput } from "@/components/floating-label-input"
@@ -34,6 +33,7 @@ interface Product {
     category: ProductCategory | null
     brand: ProductBrand | null
     unit: ProductUnit | null
+    imageUrl: string | null // Added imageUrl
 }
 
 interface ProductCategory {
@@ -70,6 +70,7 @@ export default function ProductsPage() {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null)
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
+    const [imageFile, setImageFile] = useState<File | null>(null) // State for the selected image file
 
     // Filter states
     const [filterName, setFilterName] = useState("")
@@ -91,6 +92,7 @@ export default function ProductsPage() {
         brandId: "none",
         unitId: "none",
         active: true,
+        imageUrl: "", // Added imageUrl to formData
     })
 
     const [isClient, setIsClient] = useState(false)
@@ -112,7 +114,6 @@ export default function ProductsPage() {
             setLoading(false)
             return
         }
-
         const token = localStorage.getItem("token")
         if (!token) {
             console.error("Token tapılmadı. Məlumatlar yüklənmədi.")
@@ -120,10 +121,8 @@ export default function ProductsPage() {
             setLoading(false)
             return
         }
-
         setHasToken(true)
         setLoading(true)
-
         try {
             const productsRes = await fetch(`http://localhost:8080/api/products/filter`, {
                 method: "POST",
@@ -133,7 +132,6 @@ export default function ProductsPage() {
                 },
                 body: JSON.stringify(filterParams),
             })
-
             if (!productsRes.ok) {
                 const errorData = await productsRes.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("Məhsulları çəkərkən xəta:", productsRes.status, errorData)
@@ -149,11 +147,9 @@ export default function ProductsPage() {
                 setUnits([])
                 return
             }
-
             const productsData = await productsRes.json()
             console.log("Məhsul API cavabı:", productsData)
             setProducts(Array.isArray(productsData) ? productsData : [])
-
             const [categoriesRes, brandsRes, unitsRes] = await Promise.all([
                 fetch("http://localhost:8080/api/product-categories", {
                     headers: { Authorization: `Bearer ${token}` },
@@ -165,13 +161,11 @@ export default function ProductsPage() {
                     headers: { Authorization: `Bearer ${token}` },
                 }),
             ])
-
             const [categoriesData, brandsData, unitsData] = await Promise.all([
                 categoriesRes.json(),
                 brandsRes.json(),
                 unitsRes.json(),
             ])
-
             setCategories(Array.isArray(categoriesData) ? categoriesData : [])
             setBrands(Array.isArray(brandsData) ? brandsData : [])
             setUnits(Array.isArray(unitsData) ? unitsData : [])
@@ -216,7 +210,6 @@ export default function ProductsPage() {
         if (filterActive === "false") filterParams.active = false
         if (filterMinPrice) filterParams.minPrice = Number.parseFloat(filterMinPrice)
         if (filterMaxPrice) filterParams.maxPrice = Number.parseFloat(filterMaxPrice)
-
         fetchData(filterParams)
     }
 
@@ -236,10 +229,8 @@ export default function ProductsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (typeof window === "undefined") return
-
         const token = localStorage.getItem("token")
         if (!token) return
-
         setIsSubmittingForm(true)
 
         try {
@@ -248,24 +239,33 @@ export default function ProductsPage() {
                 : "http://localhost:8080/api/products"
             const method = editingProduct ? "PUT" : "POST"
 
-            const requestBody = {
-                name: formData.name,
-                sku: formData.sku || null,
-                description: formData.description || null,
-                price: Number.parseFloat(formData.price),
-                categoryId: formData.categoryId !== "none" ? Number.parseInt(formData.categoryId) : null,
-                brandId: formData.brandId !== "none" ? Number.parseInt(formData.brandId) : null,
-                unitId: formData.unitId !== "none" ? Number.parseInt(formData.unitId) : null,
-                active: formData.active,
+            const data = new FormData()
+            data.append("name", formData.name)
+            data.append("price", formData.price)
+            if (formData.sku) data.append("sku", formData.sku)
+            if (formData.description) data.append("description", formData.description)
+            if (formData.categoryId !== "none") data.append("categoryId", formData.categoryId)
+            if (formData.brandId !== "none") data.append("brandId", formData.brandId)
+            if (formData.unitId !== "none") data.append("unitId", formData.unitId)
+            data.append("active", String(formData.active))
+
+            if (imageFile) {
+                data.append("image", imageFile) // Append the actual file
+            } else if (editingProduct && formData.imageUrl) {
+                // If editing and no new file, but there was an existing image, send its URL
+                data.append("imageUrl", formData.imageUrl)
+            } else if (editingProduct && !formData.imageUrl && !imageFile) {
+                // If editing and image was removed, send an indicator to clear it
+                data.append("imageUrl", "") // Send empty string to indicate removal
             }
 
             const response = await fetch(url, {
                 method,
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
+                    // DO NOT set Content-Type for FormData, browser sets it automatically
                 },
-                body: JSON.stringify(requestBody),
+                body: data, // Send FormData directly
             })
 
             let responseData: ApiResponse = {}
@@ -286,7 +286,6 @@ export default function ProductsPage() {
                 })
                 setDialogOpen(false)
                 resetForm()
-                // Refresh all data including categories, brands, and units
                 await fetchData({})
             } else {
                 await Swal.fire({
@@ -312,7 +311,6 @@ export default function ProductsPage() {
         if (typeof window === "undefined") return null
         const token = localStorage.getItem("token")
         if (!token) return null
-
         try {
             const response = await fetch(`http://localhost:8080/api/products/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -342,7 +340,9 @@ export default function ProductsPage() {
                 brandId: fetchedProduct.brand ? fetchedProduct.brand.id.toString() : "none",
                 unitId: fetchedProduct.unit ? fetchedProduct.unit.id.toString() : "none",
                 active: fetchedProduct.active,
+                imageUrl: fetchedProduct.imageUrl || "", // Load existing image URL
             })
+            setImageFile(null) // Clear any previously selected new file
             setDialogOpen(true)
         } else {
             await Swal.fire({
@@ -381,21 +381,16 @@ export default function ProductsPage() {
             cancelButtonText: "Ləğv et",
             reverseButtons: true,
         })
-
         if (!result.isConfirmed) return
-
         if (typeof window === "undefined") return
         const token = localStorage.getItem("token")
         if (!token) return
-
         setDeletingId(id)
-
         try {
             const response = await fetch(`http://localhost:8080/api/products/${id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` },
             })
-
             if (response.ok) {
                 await Swal.fire({
                     title: "Silindi!",
@@ -442,7 +437,9 @@ export default function ProductsPage() {
             brandId: "none",
             unitId: "none",
             active: true,
+            imageUrl: "", // Reset image URL
         })
+        setImageFile(null) // Reset image file
         setEditingProduct(null)
     }
 
@@ -537,7 +534,6 @@ export default function ProductsPage() {
                                         </div>
                                     </div>
                                 </div>
-
                                 {/* Description */}
                                 <div className="space-y-2">
                                     <Label htmlFor="product-description">Təsvir</Label>
@@ -550,7 +546,49 @@ export default function ProductsPage() {
                                         rows={3}
                                     />
                                 </div>
-
+                                {/* Image Upload */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="product-image">Şəkil</Label>
+                                    <input
+                                        id="product-image"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                setImageFile(e.target.files[0])
+                                            } else {
+                                                setImageFile(null)
+                                            }
+                                        }}
+                                        disabled={isSubmittingForm}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                    {(imageFile || formData.imageUrl) && (
+                                        <div className="mt-2">
+                                            <p className="text-sm text-muted-foreground mb-1">Cari Şəkil:</p>
+                                            <img
+                                                src={
+                                                    imageFile
+                                                        ? URL.createObjectURL(imageFile)
+                                                        : formData.imageUrl || "/images/no-product-photo.png"
+                                                }
+                                                alt="Product Preview"
+                                                className="w-24 h-24 object-cover rounded-md border"
+                                            />
+                                            {imageFile && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setImageFile(null)}
+                                                    className="mt-1 text-red-500 hover:text-red-600"
+                                                >
+                                                    Şəkli sil
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                                 {/* Category, Brand, Unit */}
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div className="space-y-2">
@@ -614,7 +652,6 @@ export default function ProductsPage() {
                                         </Select>
                                     </div>
                                 </div>
-
                                 {/* Active Status */}
                                 <div className="flex items-center space-x-2">
                                     <Switch
@@ -644,7 +681,6 @@ export default function ProductsPage() {
                     </DialogContent>
                 </Dialog>
             </div>
-
             {/* Product Details Modal */}
             <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
                 <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
@@ -677,15 +713,25 @@ export default function ProductsPage() {
                                             <p className="text-lg font-bold text-green-600">{selectedProduct.price}</p>
                                         </div>
                                         <div className="space-y-1">
-                                            {" "}
-                                            {/* Added space-y-1 for spacing */}
                                             <Label className="text-sm font-medium text-gray-500">Status</Label>
                                             <Badge variant={selectedProduct.active ? "default" : "secondary"} className="w-fit">
-                                                {" "}
-                                                {/* Removed mt-1, block */}
                                                 {selectedProduct.active ? "Aktiv" : "Deaktiv"}
                                             </Badge>
                                         </div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader>
+                                        <h3 className="text-lg font-semibold">Şəkil</h3>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <img
+                                            src={selectedProduct.imageUrl || "/images/no-product-photo.png"}
+                                            alt={selectedProduct.name}
+                                            width={200}
+                                            height={200}
+                                            className="w-full h-48 object-contain rounded-md border"
+                                        />
                                     </CardContent>
                                 </Card>
                             </div>
@@ -744,7 +790,6 @@ export default function ProductsPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
             {/* Filter Section */}
             <Card>
                 <CardHeader>
@@ -796,7 +841,6 @@ export default function ProductsPage() {
                                 />
                             </div>
                         </div>
-
                         {/* Second row - Select inputs */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <div className="space-y-2">
@@ -861,7 +905,6 @@ export default function ProductsPage() {
                                 </Select>
                             </div>
                         </div>
-
                         {/* Filter and Reset buttons */}
                         <div className="flex justify-end gap-2">
                             <Button onClick={handleFilter} size="icon" title="Filterlə">
@@ -878,6 +921,7 @@ export default function ProductsPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[80px]">Şəkil</TableHead> {/* Added Image column */}
                                     <TableHead>Ad</TableHead>
                                     <TableHead>SKU</TableHead>
                                     <TableHead>Qiymət</TableHead>
@@ -888,24 +932,29 @@ export default function ProductsPage() {
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8">
-                                            {" "}
-                                            {/* colSpan adjusted */}
+                                        <TableCell colSpan={6} className="text-center py-8">
                                             <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                                             <p className="mt-2 text-sm text-gray-500">Məlumatlar yüklənir...</p>
                                         </TableCell>
                                     </TableRow>
                                 ) : products.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8">
-                                            {" "}
-                                            {/* colSpan adjusted */}
+                                        <TableCell colSpan={6} className="text-center py-8">
                                             <p className="text-sm text-gray-500">Heç bir məhsul tapılmadı</p>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     products.map((product) => (
                                         <TableRow key={product.id}>
+                                            <TableCell>
+                                                <img
+                                                    src={product.imageUrl || "/images/no-product-photo.png"}
+                                                    alt={product.name}
+                                                    width={64}
+                                                    height={64}
+                                                    className="aspect-square rounded-md object-cover"
+                                                />
+                                            </TableCell>
                                             <TableCell className="font-medium">{product.name}</TableCell>
                                             <TableCell>{product.sku || "N/A"}</TableCell>
                                             <TableCell className="font-semibold text-green-600">{product.price}</TableCell>

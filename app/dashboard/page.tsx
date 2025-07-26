@@ -2,21 +2,27 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, Tags, Layers, Scale } from "lucide-react"
+import {Package, Tags, Layers, Scale, Currency, Users, UserRound} from "lucide-react"
 
 interface Stats {
+  users: number
+  roles: number
   products: number
   categories: number
   brands: number
   units: number
+  currencies: number
 }
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats>({
+    users: 0,
+    roles: 0,
     products: 0,
     categories: 0,
     brands: 0,
     units: 0,
+    currencies: 0,
   })
 
   useEffect(() => {
@@ -25,7 +31,13 @@ export default function DashboardPage() {
       if (!token) return
 
       try {
-        const [productsRes, categoriesRes, brandsRes, unitsRes] = await Promise.all([
+        const [usersRes, rolesRes, productsRes, categoriesRes, brandsRes, unitsRes, currenciesRes] = await Promise.all([
+          fetch("http://localhost:8080/api/users", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("http://localhost:8080/api/roles", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
           fetch("http://localhost:8080/api/products", {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -38,23 +50,32 @@ export default function DashboardPage() {
           fetch("http://localhost:8080/api/product-units", {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch("http://localhost:8080/api/currencies", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ])
 
-        const [products, categories, brands, units] = await Promise.all([
+        const [users, roles, products, categories, brands, units, currencies] = await Promise.all([
+          usersRes.json(),
+          rolesRes.json(),
           productsRes.json(),
           categoriesRes.json(),
           brandsRes.json(),
           unitsRes.json(),
+          currenciesRes.json(),
         ])
 
         setStats({
+          users: users.length || 0,
+          roles: roles.length || 0,
           products: products.length || 0,
           categories: categories.length || 0,
           brands: brands.length || 0,
           units: units.length || 0,
+          currencies: currencies.length || 0,
         })
       } catch (error) {
-        console.error("Stats yüklənmədi:", error)
+        console.error("Statistika yüklənmədi:", error)
       }
     }
 
@@ -63,18 +84,32 @@ export default function DashboardPage() {
 
   const statCards = [
     {
+      title: "İstifadəçilər",
+      value: stats.users,
+      icon: Users,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+    },
+    {
+      title: "İstifadəçi rolları",
+      value: stats.roles,
+      icon: UserRound,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-100",
+    },
+    {
       title: "Məhsullar",
       value: stats.products,
       icon: Package,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-green-600",
+      bgColor: "bg-green-100",
     },
     {
       title: "Kateqoriyalar",
       value: stats.categories,
       icon: Tags,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
     },
     {
       title: "Brendlər",
@@ -87,10 +122,17 @@ export default function DashboardPage() {
       title: "Ölçü vahidləri",
       value: stats.units,
       icon: Scale,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100",
+      color: "text-pink-600",
+      bgColor: "bg-pink-100",
     },
-  ]
+    {
+      title: "Valyutalar",
+      value: stats.currencies,
+      icon: Currency,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+    },
+  ];
 
   return (
       <div>
@@ -119,13 +161,9 @@ export default function DashboardPage() {
           <Card>
             <CardContent>
               <div className="space-y-4">
-                <p className="text-gray-600 pt-4">Bu paneldə aşağıdakı əməliyyatları həyata keçirə bilərsiniz:</p>
-                <ul className="list-disc list-inside space-y-2 text-gray-600">
-                  <li>Məhsulları əlavə etmək, redaktə etmək və silmək</li>
-                  <li>Kateqoriyaları idarə etmək</li>
-                  <li>Brendləri idarə etmək</li>
-                  <li>Ölçü vahidlərini idarə etmək</li>
-                </ul>
+                <p className="text-gray-600 pt-4">
+                  Burada başqa statistikalar olacaq
+                </p>
               </div>
             </CardContent>
           </Card>
