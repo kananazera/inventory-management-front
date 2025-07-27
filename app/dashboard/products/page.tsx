@@ -33,7 +33,7 @@ interface Product {
     category: ProductCategory | null
     brand: ProductBrand | null
     unit: ProductUnit | null
-    imageUrl: string | null // Added imageUrl
+    imageUrl: string | null
 }
 
 interface ProductCategory {
@@ -70,7 +70,7 @@ export default function ProductsPage() {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null)
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
-    const [imageFile, setImageFile] = useState<File | null>(null) // State for the selected image file
+    const [imageFile, setImageFile] = useState<File | null>(null)
 
     // Filter states
     const [filterName, setFilterName] = useState("")
@@ -92,7 +92,7 @@ export default function ProductsPage() {
         brandId: "none",
         unitId: "none",
         active: true,
-        imageUrl: "", // Added imageUrl to formData
+        imageUrl: "",
     })
 
     const [isClient, setIsClient] = useState(false)
@@ -121,6 +121,7 @@ export default function ProductsPage() {
             setLoading(false)
             return
         }
+
         setHasToken(true)
         setLoading(true)
         try {
@@ -132,6 +133,7 @@ export default function ProductsPage() {
                 },
                 body: JSON.stringify(filterParams),
             })
+
             if (!productsRes.ok) {
                 const errorData = await productsRes.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("Məhsulları çəkərkən xəta:", productsRes.status, errorData)
@@ -147,9 +149,11 @@ export default function ProductsPage() {
                 setUnits([])
                 return
             }
+
             const productsData = await productsRes.json()
             console.log("Məhsul API cavabı:", productsData)
             setProducts(Array.isArray(productsData) ? productsData : [])
+
             const [categoriesRes, brandsRes, unitsRes] = await Promise.all([
                 fetch("http://localhost:8080/api/product-categories", {
                     headers: { Authorization: `Bearer ${token}` },
@@ -161,11 +165,13 @@ export default function ProductsPage() {
                     headers: { Authorization: `Bearer ${token}` },
                 }),
             ])
+
             const [categoriesData, brandsData, unitsData] = await Promise.all([
                 categoriesRes.json(),
                 brandsRes.json(),
                 unitsRes.json(),
             ])
+
             setCategories(Array.isArray(categoriesData) ? categoriesData : [])
             setBrands(Array.isArray(brandsData) ? brandsData : [])
             setUnits(Array.isArray(unitsData) ? unitsData : [])
@@ -210,6 +216,7 @@ export default function ProductsPage() {
         if (filterActive === "false") filterParams.active = false
         if (filterMinPrice) filterParams.minPrice = Number.parseFloat(filterMinPrice)
         if (filterMaxPrice) filterParams.maxPrice = Number.parseFloat(filterMaxPrice)
+
         fetchData(filterParams)
     }
 
@@ -231,8 +238,8 @@ export default function ProductsPage() {
         if (typeof window === "undefined") return
         const token = localStorage.getItem("token")
         if (!token) return
-        setIsSubmittingForm(true)
 
+        setIsSubmittingForm(true)
         try {
             const url = editingProduct
                 ? `http://localhost:8080/api/products/${editingProduct.id}`
@@ -250,22 +257,19 @@ export default function ProductsPage() {
             data.append("active", String(formData.active))
 
             if (imageFile) {
-                data.append("image", imageFile) // Append the actual file
+                data.append("image", imageFile)
             } else if (editingProduct && formData.imageUrl) {
-                // If editing and no new file, but there was an existing image, send its URL
                 data.append("imageUrl", formData.imageUrl)
             } else if (editingProduct && !formData.imageUrl && !imageFile) {
-                // If editing and image was removed, send an indicator to clear it
-                data.append("imageUrl", "") // Send empty string to indicate removal
+                data.append("imageUrl", "")
             }
 
             const response = await fetch(url, {
                 method,
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    // DO NOT set Content-Type for FormData, browser sets it automatically
                 },
-                body: data, // Send FormData directly
+                body: data,
             })
 
             let responseData: ApiResponse = {}
@@ -311,6 +315,7 @@ export default function ProductsPage() {
         if (typeof window === "undefined") return null
         const token = localStorage.getItem("token")
         if (!token) return null
+
         try {
             const response = await fetch(`http://localhost:8080/api/products/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -340,9 +345,9 @@ export default function ProductsPage() {
                 brandId: fetchedProduct.brand ? fetchedProduct.brand.id.toString() : "none",
                 unitId: fetchedProduct.unit ? fetchedProduct.unit.id.toString() : "none",
                 active: fetchedProduct.active,
-                imageUrl: fetchedProduct.imageUrl || "", // Load existing image URL
+                imageUrl: fetchedProduct.imageUrl || "",
             })
-            setImageFile(null) // Clear any previously selected new file
+            setImageFile(null)
             setDialogOpen(true)
         } else {
             await Swal.fire({
@@ -381,16 +386,19 @@ export default function ProductsPage() {
             cancelButtonText: "Ləğv et",
             reverseButtons: true,
         })
+
         if (!result.isConfirmed) return
         if (typeof window === "undefined") return
         const token = localStorage.getItem("token")
         if (!token) return
+
         setDeletingId(id)
         try {
             const response = await fetch(`http://localhost:8080/api/products/${id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` },
             })
+
             if (response.ok) {
                 await Swal.fire({
                     title: "Silindi!",
@@ -430,16 +438,16 @@ export default function ProductsPage() {
     const resetForm = () => {
         setFormData({
             name: "",
-            sku: generateSKU(), // Auto-generate SKU for new products
+            sku: generateSKU(),
             description: "",
             price: "",
             categoryId: "none",
             brandId: "none",
             unitId: "none",
             active: true,
-            imageUrl: "", // Reset image URL
+            imageUrl: "",
         })
-        setImageFile(null) // Reset image file
+        setImageFile(null)
         setEditingProduct(null)
     }
 
@@ -487,7 +495,6 @@ export default function ProductsPage() {
                         </DialogHeader>
                         <form onSubmit={handleSubmit}>
                             <div className="grid gap-6 py-4">
-                                {/* Basic Information - 50% name, 25% price, 25% SKU */}
                                 <div className="grid grid-cols-12 gap-4">
                                     <div className="col-span-6 space-y-2">
                                         <FloatingLabelInput
@@ -534,7 +541,7 @@ export default function ProductsPage() {
                                         </div>
                                     </div>
                                 </div>
-                                {/* Description */}
+
                                 <div className="space-y-2">
                                     <Label htmlFor="product-description">Təsvir</Label>
                                     <Textarea
@@ -546,7 +553,7 @@ export default function ProductsPage() {
                                         rows={3}
                                     />
                                 </div>
-                                {/* Image Upload */}
+
                                 <div className="space-y-2">
                                     <Label htmlFor="product-image">Şəkil</Label>
                                     <input
@@ -589,7 +596,7 @@ export default function ProductsPage() {
                                         </div>
                                     )}
                                 </div>
-                                {/* Category, Brand, Unit */}
+
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div className="space-y-2">
                                         <Label>Kateqoriya</Label>
@@ -652,7 +659,7 @@ export default function ProductsPage() {
                                         </Select>
                                     </div>
                                 </div>
-                                {/* Active Status */}
+
                                 <div className="flex items-center space-x-2">
                                     <Switch
                                         id="active"
@@ -681,6 +688,7 @@ export default function ProductsPage() {
                     </DialogContent>
                 </Dialog>
             </div>
+
             {/* Product Details Modal */}
             <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
                 <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
@@ -790,11 +798,11 @@ export default function ProductsPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
             {/* Filter Section */}
             <Card>
                 <CardHeader>
                     <div className="space-y-4">
-                        {/* First row - Text inputs */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <FloatingLabelInput
@@ -841,7 +849,7 @@ export default function ProductsPage() {
                                 />
                             </div>
                         </div>
-                        {/* Second row - Select inputs */}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <Label>Kateqoriya</Label>
@@ -905,7 +913,7 @@ export default function ProductsPage() {
                                 </Select>
                             </div>
                         </div>
-                        {/* Filter and Reset buttons */}
+
                         <div className="flex justify-end gap-2">
                             <Button onClick={handleFilter} size="icon" title="Filterlə">
                                 <Search className="h-4 w-4" />
@@ -921,7 +929,7 @@ export default function ProductsPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[80px]">Şəkil</TableHead> {/* Added Image column */}
+                                    <TableHead className="w-[80px]">Şəkil</TableHead>
                                     <TableHead>Ad</TableHead>
                                     <TableHead>SKU</TableHead>
                                     <TableHead>Qiymət</TableHead>

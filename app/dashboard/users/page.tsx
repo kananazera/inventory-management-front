@@ -1,4 +1,5 @@
 "use client"
+
 import type React from "react"
 import { Eye, Search, RotateCcw, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
@@ -20,7 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Swal from "sweetalert2"
 import { FloatingLabelInput } from "@/components/floating-label-input"
-import { MultiSelectRoles } from "@/components/multi-select-roles" // Yeni import
+import { MultiSelectRoles } from "@/components/multi-select-roles"
 
 interface User {
     id: number
@@ -30,14 +31,13 @@ interface User {
     phone: string | null
     address: string | null
     gender: string | null
-    birthDate: string | null // YYYY-MM-DD formatında
+    birthDate: string | null
     active: boolean
     photoUrl: string | null
-    roles: string[] // Rolları string array kimi fərz edirik
+    roles: string[]
 }
 
 interface UserRole {
-    // Yeni interfeys
     id: number
     name: string
 }
@@ -47,41 +47,41 @@ interface ApiResponse {
     error?: string
     success?: boolean
     data?: any
-    errors?: { [key: string]: string } // Backend validasiya xətaları üçün əlavə edildi
+    errors?: { [key: string]: string }
 }
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([])
-    const [roles, setRoles] = useState<UserRole[]>([]) // Rolları saxlamaq üçün yeni state
+    const [roles, setRoles] = useState<UserRole[]>([])
     const [loading, setLoading] = useState(true)
-    const [rolesLoading, setRolesLoading] = useState(true) // Rolların yüklənməsi üçün state
+    const [rolesLoading, setRolesLoading] = useState(true)
     const [dialogOpen, setDialogOpen] = useState(false)
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
     const [selectedUser, setSelectedUser] = useState<User | null>(null)
     const [editingUser, setEditingUser] = useState<User | null>(null)
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
-    const [imageFile, setImageFile] = useState<File | null>(null) // State for the selected image file
+    const [imageFile, setImageFile] = useState<File | null>(null)
 
     // Filter states
     const [filterUsername, setFilterUsername] = useState("")
     const [filterEmail, setFilterEmail] = useState("")
     const [filterFullName, setFilterFullName] = useState("")
     const [filterActive, setFilterActive] = useState<string>("all")
-    const [filterGender, setFilterGender] = useState<string>("all") // Yeni gender filter state
+    const [filterGender, setFilterGender] = useState<string>("all")
 
     const [formData, setFormData] = useState({
         username: "",
-        password: "", // Yalnız yeni istifadəçi əlavə edərkən və ya şifrəni dəyişdirərkən istifadə olunur
+        password: "",
         email: "",
         fullName: "",
         phone: "",
         address: "",
-        gender: "", // "none" yerinə boş string
+        gender: "",
         birthDate: "",
         active: true,
-        photoUrl: "", // Mövcud şəkil URL-i üçün
-        roleIds: [] as number[], // Seçilmiş rolların ID-ləri üçün yeni sahə
+        photoUrl: "",
+        roleIds: [] as number[],
     })
 
     const [isClient, setIsClient] = useState(false)
@@ -95,7 +95,7 @@ export default function UsersPage() {
             return `${day}.${month}.${year}`
         } catch (e) {
             console.error("Doğum tarixi formatında xəta:", e)
-            return dateString // Fallback to original if parsing fails
+            return dateString
         }
     }
 
@@ -112,7 +112,6 @@ export default function UsersPage() {
         }
         setRolesLoading(true)
         try {
-            // Endpoint 'user-roles' yerine 'roles' olarak değiştirildi
             const response = await fetch(`http://localhost:8080/api/roles/filter`, {
                 method: "POST",
                 headers: {
@@ -135,9 +134,8 @@ export default function UsersPage() {
             setRoles([])
         } finally {
             setRolesLoading(false)
-            console.log("fetchRoles tamamlandı. rolesLoading:", false, "Rolların sayı:", roles.length) // Diaqnostika
         }
-    }, [roles.length]) // roles.length əlavə edildi ki, callback yenilənsin və son dəyəri göstərsin
+    }, [])
 
     const fetchData = useCallback(async (filterParams: Record<string, any> = {}) => {
         if (typeof window === "undefined") {
@@ -154,7 +152,7 @@ export default function UsersPage() {
         setHasToken(true)
         setLoading(true)
         try {
-            const usersRes = await fetch(`http://localhost:8080/api/users/filter`, {
+            const response = await fetch(`http://localhost:8080/api/users/filter`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -162,21 +160,21 @@ export default function UsersPage() {
                 },
                 body: JSON.stringify(filterParams),
             })
-            if (!usersRes.ok) {
-                const errorData = await usersRes.json().catch(() => ({ message: "Naməlum xəta" }))
-                console.error("İstifadəçiləri çəkərkən xəta:", usersRes.status, errorData)
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: "Naməlum xəta" }))
+                console.error("İstifadəçiləri çəkərkən xəta:", response.status, errorData)
                 await Swal.fire({
                     title: "Xəta!",
-                    text: errorData.message || errorData.error || `İstifadəçilər yüklənmədi: Status ${usersRes.status}`,
+                    text: errorData.message || errorData.error || `İstifadəçilər yüklənmədi: Status ${response.status}`,
                     icon: "error",
                     confirmButtonColor: "#ef4444",
                 })
                 setUsers([])
                 return
             }
-            const usersData = await usersRes.json()
-            console.log("İstifadəçi API cavabı:", usersData)
-            setUsers(Array.isArray(usersData) ? usersData : [])
+            const data = await response.json()
+            console.log("İstifadəçi API cavabı:", data)
+            setUsers(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error("Məlumatları çəkərkən bağlantı xətası:", error)
             await Swal.fire({
@@ -200,7 +198,7 @@ export default function UsersPage() {
     useEffect(() => {
         if (isClient && hasToken) {
             fetchData({})
-            fetchRoles() // Rolları da yüklə
+            fetchRoles()
         }
     }, [isClient, hasToken, fetchData, fetchRoles])
 
@@ -211,8 +209,8 @@ export default function UsersPage() {
         if (filterFullName) filterParams.fullName = filterFullName
         if (filterActive === "true") filterParams.active = true
         if (filterActive === "false") filterParams.active = false
-        if (filterGender !== "all") filterParams.gender = filterGender // Yeni gender filter əlavə edildi
-        console.log("Filtering with params:", filterParams) // Filter üçün göndərilən parametrləri yoxlamaq üçün log
+        if (filterGender !== "all") filterParams.gender = filterGender
+        console.log("Filtering with params:", filterParams)
         fetchData(filterParams)
     }
 
@@ -221,7 +219,7 @@ export default function UsersPage() {
         setFilterEmail("")
         setFilterFullName("")
         setFilterActive("all")
-        setFilterGender("all") // Gender filter sıfırlandı
+        setFilterGender("all")
         fetchData({})
     }
 
@@ -231,41 +229,36 @@ export default function UsersPage() {
         const token = localStorage.getItem("token")
         if (!token) return
         setIsSubmittingForm(true)
-
         try {
             const url = editingUser ? `http://localhost:8080/api/users/${editingUser.id}` : "http://localhost:8080/api/users"
             const method = editingUser ? "PUT" : "POST"
-
             const data = new FormData()
             data.append("username", formData.username)
             data.append("email", formData.email)
             data.append("active", String(formData.active))
-
-            if (formData.password) data.append("password", formData.password) // Şifrə yalnız daxil edildikdə göndərilir
+            if (formData.password) data.append("password", formData.password)
             if (formData.fullName) data.append("fullName", formData.fullName)
             if (formData.phone) data.append("phone", formData.phone)
             if (formData.address) data.append("address", formData.address)
-            if (formData.gender) data.append("gender", formData.gender) // Gender boş string olarsa göndərilməyəcək
+            if (formData.gender) data.append("gender", formData.gender)
             if (formData.birthDate) data.append("birthDate", formData.birthDate)
 
-            // Rolları FormData-ya əlavə et
             formData.roleIds.forEach((roleId) => {
                 data.append("roleIds", String(roleId))
             })
 
             if (imageFile) {
-                data.append("photo", imageFile) // Şəkil faylı
+                data.append("photo", imageFile)
             } else if (editingUser && formData.photoUrl) {
-                data.append("photoUrl", formData.photoUrl) // Mövcud şəkil URL-i
+                data.append("photoUrl", formData.photoUrl)
             } else if (editingUser && !formData.photoUrl && !imageFile) {
-                data.append("photoUrl", "") // Şəkil silinibsə
+                data.append("photoUrl", "")
             }
 
             const response = await fetch(url, {
                 method,
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    // FormData istifadə edərkən Content-Type təyin etməyin
                 },
                 body: data,
             })
@@ -274,7 +267,7 @@ export default function UsersPage() {
             try {
                 responseData = await response.json()
             } catch (e) {
-                responseData = {} // JSON parse xətası olarsa boş obyekt
+                responseData = {}
             }
 
             if (response.ok) {
@@ -291,22 +284,17 @@ export default function UsersPage() {
                 await fetchData({})
             } else {
                 let errorMessage = responseData.message || responseData.error || "Əməliyyat uğursuz oldu"
-
-                // Backenddən gələn 'errors' obyektini yoxlayırıq
                 if (responseData.errors) {
                     const errorMessages = Object.entries(responseData.errors)
                         .map(([key, value]) => {
-                            // 'roleIds' xətası üçün xüsusi mesaj
                             if (key === "roleIds") {
                                 return `Rollar: ${value}`
                             }
-                            // Digər xətalar üçün ümumi format
                             return `${key}: ${value}`
                         })
-                        .join("\n") // Hər xətanı yeni sətirdə göstəririk
+                        .join("\n")
                     errorMessage = `Aşağıdakı xətalar baş verdi:\n${errorMessages}`
                 }
-
                 await Swal.fire({
                     title: "Xəta!",
                     text: errorMessage,
@@ -349,26 +337,27 @@ export default function UsersPage() {
     const handleEdit = async (user: User) => {
         const fetchedUser = await fetchUserById(user.id)
         if (fetchedUser) {
-            // Rolların adlarını ID-lərə çevir
-            const selectedRoleIds = fetchedUser.roles
+            const selectedroles = fetchedUser.roles
                 .map((roleName) => roles.find((r) => r.name === roleName)?.id)
                 .filter((id): id is number => id !== undefined)
-
+            console.log("Fetched user roles:", fetchedUser.roles)
+            console.log("Available roles:", roles)
+            console.log("Selected role IDs:", selectedroles)
             setEditingUser(fetchedUser)
             setFormData({
                 username: fetchedUser.username,
-                password: "", // Şifrəni redaktə zamanı boş saxlayırıq, dəyişmək istəyirsə yenidən daxil etməlidir
+                password: "",
                 email: fetchedUser.email,
                 fullName: fetchedUser.fullName || "",
                 phone: fetchedUser.phone || "",
                 address: fetchedUser.address || "",
-                gender: fetchedUser.gender || "", // Boş string olaraq saxlayırıq
+                gender: fetchedUser.gender || "",
                 birthDate: fetchedUser.birthDate || "",
                 active: fetchedUser.active,
                 photoUrl: fetchedUser.photoUrl || "",
-                roleIds: selectedRoleIds, // Seçilmiş rolların ID-lərini təyin et
+                roleIds: selectedroles,
             })
-            setImageFile(null) // Yeni fayl seçimini təmizlə
+            setImageFile(null)
             setDialogOpen(true)
         } else {
             await Swal.fire({
@@ -383,6 +372,7 @@ export default function UsersPage() {
     const handleViewDetails = async (user: User) => {
         const fetchedUser = await fetchUserById(user.id)
         if (fetchedUser) {
+            console.log("User details - roles:", fetchedUser.roles)
             setSelectedUser(fetchedUser)
             setDetailsDialogOpen(true)
         } else {
@@ -461,11 +451,11 @@ export default function UsersPage() {
             fullName: "",
             phone: "",
             address: "",
-            gender: "", // Boş string olaraq saxlayırıq
+            gender: "",
             birthDate: "",
             active: true,
             photoUrl: "",
-            roleIds: [], // Rolları sıfırla
+            roleIds: [],
         })
         setImageFile(null)
         setEditingUser(null)
@@ -494,18 +484,14 @@ export default function UsersPage() {
         )
     }
 
-    // Ana yüklənmə göstəricisi
     if (loading || rolesLoading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-10 w-10 animate-spin text-black" />
-                <span className="ml-2">Məlumatlar yüklənir...</span> {/* Yazı geri qaytarıldı */}
+                <span className="ml-2">Məlumatlar yüklənir...</span>
             </div>
         )
     }
-
-    console.log("MultiSelectRoles disabled state:", isSubmittingForm || rolesLoading) // Diaqnostika
-    console.log("Current roles array:", roles) // Diaqnostika
 
     return (
         <div>
@@ -528,7 +514,6 @@ export default function UsersPage() {
                         </DialogHeader>
                         <form onSubmit={handleSubmit}>
                             <div className="grid gap-6 py-4">
-                                {/* Basic Information */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <FloatingLabelInput
@@ -558,7 +543,7 @@ export default function UsersPage() {
                                             type="password"
                                             value={formData.password}
                                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                            required={!editingUser} // Yalnız yeni istifadəçi üçün məcburi
+                                            required={!editingUser}
                                             disabled={isSubmittingForm}
                                         />
                                     </div>
@@ -591,20 +576,18 @@ export default function UsersPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Cins</Label>
-                                        <Select
-                                            value={formData.gender}
-                                            onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                                        <Label htmlFor="user-gender">Cins</Label>
+                                        <select
+                                            id="user-gender"
+                                            value={formData.gender || ""}
+                                            onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                                             disabled={isSubmittingForm}
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
-                                                <SelectValue placeholder="Cins seçin..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="max-h-[200px] overflow-y-auto">
-                                                <SelectItem value="MALE">Kişi</SelectItem>
-                                                <SelectItem value="FEMALE">Qadın</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                            <option value="">Cins seçin...</option>
+                                            <option value="MALE">Kişi</option>
+                                            <option value="FEMALE">Qadın</option>
+                                        </select>
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="user-birthDate">Doğum tarixi</Label>
@@ -618,8 +601,6 @@ export default function UsersPage() {
                                         />
                                     </div>
                                 </div>
-
-                                {/* Roles Multi-Select */}
                                 <div className="space-y-2">
                                     <Label>Rollar</Label>
                                     <MultiSelectRoles
@@ -631,8 +612,6 @@ export default function UsersPage() {
                                         placeholder="Rollar seçin (maks. 5)"
                                     />
                                 </div>
-
-                                {/* Photo Upload */}
                                 <div className="space-y-2">
                                     <Label htmlFor="user-photo">Şəkil</Label>
                                     <input
@@ -673,8 +652,6 @@ export default function UsersPage() {
                                         </div>
                                     )}
                                 </div>
-
-                                {/* Active Status */}
                                 <div className="flex items-center space-x-2">
                                     <Switch
                                         id="active"
@@ -703,6 +680,7 @@ export default function UsersPage() {
                     </DialogContent>
                 </Dialog>
             </div>
+
             {/* User Details Modal */}
             <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
                 <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
@@ -774,7 +752,7 @@ export default function UsersPage() {
                                                         </Badge>
                                                     ))
                                                 ) : (
-                                                    <Badge variant="outline">Yoxdur</Badge>
+                                                    <Badge variant="outline">Rol təyin edilməyib</Badge>
                                                 )}
                                             </div>
                                         </div>
@@ -815,11 +793,11 @@ export default function UsersPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
             {/* Filter Section */}
             <Card>
                 <CardHeader>
                     <div className="space-y-4">
-                        {/* Filter inputs */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <FloatingLabelInput
@@ -846,34 +824,32 @@ export default function UsersPage() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Status</Label>
+                                <Label htmlFor="filter-active">Status</Label>
                                 <Select value={filterActive} onValueChange={setFilterActive}>
-                                    <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
+                                    <SelectTrigger id="filter-active" className="w-full">
                                         <SelectValue placeholder="Status seçin..." />
                                     </SelectTrigger>
-                                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                                    <SelectContent>
                                         <SelectItem value="all">Hamısı</SelectItem>
                                         <SelectItem value="true">Aktiv</SelectItem>
                                         <SelectItem value="false">Deaktiv</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            {/* Filter Section - Gender filter */}
                             <div className="space-y-2">
-                                <Label>Cins</Label>
-                                <Select value={filterGender} onValueChange={setFilterGender}>
-                                    <SelectTrigger className="h-10 px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0">
-                                        <SelectValue placeholder="Cins seçin..." />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-[200px] overflow-y-auto">
-                                        <SelectItem value="all">Hamısı</SelectItem>
-                                        <SelectItem value="MALE">Kişi</SelectItem>
-                                        <SelectItem value="FEMALE">Qadın</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="filter-gender">Cins</Label>
+                                <select
+                                    id="filter-gender"
+                                    value={filterGender}
+                                    onChange={(e) => setFilterGender(e.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    <option value="all">Hamısı</option>
+                                    <option value="MALE">Kişi</option>
+                                    <option value="FEMALE">Qadın</option>
+                                </select>
                             </div>
                         </div>
-                        {/* Filter and Reset buttons */}
                         <div className="flex justify-end gap-2">
                             <Button onClick={handleFilter} size="icon" title="Filterlə">
                                 <Search className="h-4 w-4" />
@@ -902,7 +878,7 @@ export default function UsersPage() {
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center py-8">
                                             <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                                            <p className="mt-2 text-sm text-gray-500">Məlumatlar yüklənir...</p> {/* Yazı geri qaytarıldı */}
+                                            <p className="mt-2 text-sm text-gray-500">Məlumatlar yüklənir...</p>
                                         </TableCell>
                                     </TableRow>
                                 ) : users.length === 0 ? (
@@ -925,7 +901,7 @@ export default function UsersPage() {
                                             </TableCell>
                                             <TableCell className="font-medium">{user.username}</TableCell>
                                             <TableCell>{user.email}</TableCell>
-                                            <TableCell>{user.fullName || "N/A"}</TableCell>
+                                            <TableCell>{user.fullName || "Təyin edilməyib"}</TableCell>
                                             <TableCell>
                                                 <Badge variant={user.active ? "default" : "secondary"}>
                                                     {user.active ? "Aktiv" : "Deaktiv"}
