@@ -1,5 +1,7 @@
 "use client"
 
+import { DialogTrigger } from "@/components/ui/dialog"
+
 import type React from "react"
 import { Eye, Search, RotateCcw, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
@@ -14,7 +16,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
@@ -67,8 +68,11 @@ export default function UsersPage() {
     const [filterUsername, setFilterUsername] = useState("")
     const [filterEmail, setFilterEmail] = useState("")
     const [filterFullName, setFilterFullName] = useState("")
+    const [filterPhone, setFilterPhone] = useState("")
     const [filterActive, setFilterActive] = useState<string>("all")
     const [filterGender, setFilterGender] = useState<string>("all")
+    const [filterBirthDate, setFilterBirthDate] = useState("")
+    const [filterRoles, setFilterRoles] = useState<number[]>([])
 
     const [formData, setFormData] = useState({
         username: "",
@@ -207,9 +211,12 @@ export default function UsersPage() {
         if (filterUsername) filterParams.username = filterUsername
         if (filterEmail) filterParams.email = filterEmail
         if (filterFullName) filterParams.fullName = filterFullName
+        if (filterPhone) filterParams.phone = filterPhone
         if (filterActive === "true") filterParams.active = true
         if (filterActive === "false") filterParams.active = false
         if (filterGender !== "all") filterParams.gender = filterGender
+        if (filterBirthDate) filterParams.birthDate = filterBirthDate
+        if (filterRoles.length > 0) filterParams.roles = filterRoles
         console.log("Filtering with params:", filterParams)
         fetchData(filterParams)
     }
@@ -218,8 +225,11 @@ export default function UsersPage() {
         setFilterUsername("")
         setFilterEmail("")
         setFilterFullName("")
+        setFilterPhone("")
         setFilterActive("all")
         setFilterGender("all")
+        setFilterBirthDate("")
+        setFilterRoles([])
         fetchData({})
     }
 
@@ -824,6 +834,14 @@ export default function UsersPage() {
                                 />
                             </div>
                             <div className="space-y-2">
+                                <FloatingLabelInput
+                                    id="filterPhone"
+                                    label="Telefon"
+                                    value={filterPhone}
+                                    onChange={(e) => setFilterPhone(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
                                 <Label htmlFor="filter-active">Status</Label>
                                 <Select value={filterActive} onValueChange={setFilterActive}>
                                     <SelectTrigger id="filter-active" className="w-full">
@@ -848,6 +866,27 @@ export default function UsersPage() {
                                     <option value="MALE">Kişi</option>
                                     <option value="FEMALE">Qadın</option>
                                 </select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="filter-birthDate">Doğum tarixi</Label>
+                                <input
+                                    id="filter-birthDate"
+                                    type="date"
+                                    value={filterBirthDate}
+                                    onChange={(e) => setFilterBirthDate(e.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Rollar</Label>
+                                <MultiSelectRoles
+                                    options={roles}
+                                    selected={filterRoles}
+                                    onSelect={(selectedIds) => setFilterRoles(selectedIds)}
+                                    disabled={rolesLoading}
+                                    maxSelection={10}
+                                    placeholder="Rollar seçin..."
+                                />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2">
