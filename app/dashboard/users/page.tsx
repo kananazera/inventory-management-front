@@ -19,6 +19,75 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Swal from "sweetalert2"
+import { Skeleton } from "@/components/ui/skeleton" // Skeleton komponenti import edildi
+
+// SweetAlert konfiqurasiyası
+const swalConfig = {
+    customClass: {
+        container: "swal-container",
+        popup: "swal-popup",
+        header: "swal-header",
+        title: "swal-title",
+        closeButton: "swal-close-button",
+        icon: "swal-icon",
+        image: "swal-image",
+        content: "swal-content",
+        htmlContainer: "swal-html-container",
+        input: "swal-input",
+        inputLabel: "swal-input-label",
+        validationMessage: "swal-validation-message",
+        actions: "swal-actions",
+        confirmButton: "swal-confirm-button",
+        denyButton: "swal-deny-button",
+        cancelButton: "swal-cancel-button",
+        loader: "swal-loader",
+        footer: "swal-footer",
+        timerProgressBar: "swal-timer-progress-bar",
+    },
+    backdrop: true,
+    allowOutsideClick: true,
+    allowEscapeKey: true,
+    stopKeydownPropagation: true,
+    keydownListenerCapture: false,
+    showConfirmButton: true,
+    showDenyButton: false,
+    showCancelButton: false,
+    confirmButtonText: "OK",
+    returnFocus: true,
+    focusConfirm: true,
+    focusDeny: true,
+    focusCancel: true,
+    heightAuto: true,
+    padding: "1.25rem",
+    width: "32rem",
+    position: "center",
+}
+
+// SweetAlert helper funksiyası
+const showSwal = (options: any) => {
+    return Swal.fire({
+        ...swalConfig,
+        ...options,
+        didOpen: () => {
+            // Ensure the modal is properly focused
+            const confirmButton = document.querySelector(".swal2-confirm") as HTMLElement
+            if (confirmButton) {
+                confirmButton.focus()
+            }
+            // Call custom didOpen if provided
+            if (options.didOpenCustom) {
+                options.didOpenCustom()
+            }
+        },
+        willClose: () => {
+            // Call custom willClose if provided
+            if (options.willCloseCustom) {
+                options.willCloseCustom()
+            }
+        },
+    })
+}
+
 import { FloatingLabelInput } from "@/components/floating-label-input"
 import { MultiSelectRoles } from "@/components/multi-select-roles"
 
@@ -61,6 +130,7 @@ export default function UsersPage() {
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
     const [imageFile, setImageFile] = useState<File | null>(null)
+    const [ignoreDialogClose, setIgnoreDialogClose] = useState(false) // New state for ignoring dialog close
 
     // Filter states
     const [filterUsername, setFilterUsername] = useState("")
@@ -165,11 +235,15 @@ export default function UsersPage() {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("İstifadəçiləri çəkərkən xəta:", response.status, errorData)
-                await Swal.fire({
+                showSwal({
                     title: "Xəta!",
                     text: errorData.message || errorData.error || `İstifadəçilər yüklənmədi: Status ${response.status}`,
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false, // Override default for errors
+                    allowEscapeKey: false, // Override default for errors
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
                 })
                 setUsers([])
                 return
@@ -179,11 +253,15 @@ export default function UsersPage() {
             setUsers(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error("Məlumatları çəkərkən bağlantı xətası:", error)
-            await Swal.fire({
+            showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Override default for errors
+                allowEscapeKey: false, // Override default for errors
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
             })
             setUsers([])
         } finally {
@@ -237,6 +315,21 @@ export default function UsersPage() {
         const token = localStorage.getItem("token")
         if (!token) return
 
+        // Validate that at least one role is selected
+        if (formData.roles.length === 0) {
+            showSwal({
+                title: "Xəta!",
+                text: "Ən azı bir rol seçilməlidir",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Override default for errors
+                allowEscapeKey: false, // Override default for errors
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
+            })
+            return
+        }
+
         setIsSubmittingForm(true)
         try {
             const url = editingUser ? `http://localhost:8080/api/users/${editingUser.id}` : "http://localhost:8080/api/users"
@@ -283,7 +376,7 @@ export default function UsersPage() {
             }
 
             if (response.ok) {
-                await Swal.fire({
+                await showSwal({
                     title: "Uğurlu!",
                     text: editingUser ? "İstifadəçi uğurla yeniləndi" : "İstifadəçi uğurla əlavə edildi",
                     icon: "success",
@@ -291,7 +384,7 @@ export default function UsersPage() {
                     timer: 2000,
                     timerProgressBar: true,
                 })
-                setDialogOpen(false)
+                setDialogOpen(false) // This closes the main dialog ONLY on success
                 resetForm()
                 await fetchData({})
             } else {
@@ -308,19 +401,27 @@ export default function UsersPage() {
                         .join("\n")
                     errorMessage = `Aşağıdakı xətalar baş verdi:\n${errorMessages}`
                 }
-                await Swal.fire({
+                showSwal({
                     title: "Xəta!",
                     text: errorMessage,
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false, // Override default for errors
+                    allowEscapeKey: false, // Override default for errors
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
                 })
             }
         } catch (error) {
-            await Swal.fire({
+            showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Override default for errors
+                allowEscapeKey: false, // Override default for errors
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
             })
         } finally {
             setIsSubmittingForm(false)
@@ -375,11 +476,15 @@ export default function UsersPage() {
             setImageFile(null)
             setDialogOpen(true)
         } else {
-            await Swal.fire({
+            showSwal({
                 title: "Xəta!",
                 text: "İstifadəçi məlumatları yüklənə bilmədi.",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Override default for errors
+                allowEscapeKey: false, // Override default for errors
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
             })
         }
     }
@@ -391,17 +496,21 @@ export default function UsersPage() {
             setSelectedUser(fetchedUser)
             setDetailsDialogOpen(true)
         } else {
-            await Swal.fire({
+            showSwal({
                 title: "Xəta!",
                 text: "İstifadəçi məlumatları yüklənə bilmədi.",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Override default for errors
+                allowEscapeKey: false, // Override default for errors
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
             })
         }
     }
 
     const handleDelete = async (id: number) => {
-        const result = await Swal.fire({
+        const result = await showSwal({
             title: "Əminsiniz?",
             text: "Bu istifadəçini silmək istədiyinizə əminsiniz? Bu əməliyyat geri alına bilməz!",
             icon: "warning",
@@ -424,7 +533,7 @@ export default function UsersPage() {
                 headers: { Authorization: `Bearer ${token}` },
             })
             if (response.ok) {
-                await Swal.fire({
+                await showSwal({
                     title: "Silindi!",
                     text: "İstifadəçi uğurla silindi",
                     icon: "success",
@@ -440,19 +549,27 @@ export default function UsersPage() {
                 } catch (e) {
                     responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
                 }
-                await Swal.fire({
+                showSwal({
                     title: "Xəta!",
                     text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false, // Override default for errors
+                    allowEscapeKey: false, // Override default for errors
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
                 })
             }
         } catch (error) {
-            await Swal.fire({
+            showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Override default for errors
+                allowEscapeKey: false, // Override default for errors
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
             })
         } finally {
             setDeletingId(null)
@@ -477,6 +594,39 @@ export default function UsersPage() {
         setEditingUser(null)
     }
 
+    useEffect(() => {
+        // SweetAlert CSS stilləri
+        const style = document.createElement("style")
+        style.textContent = `
+    .swal-container, .swal2-container {
+        z-index: 10000 !important;
+        position: fixed !important;
+    }
+    .swal-popup, .swal2-popup {
+        z-index: 10001 !important;
+        position: relative !important;
+    }
+    .swal2-backdrop-show {
+        z-index: 9999 !important;
+    }
+    .swal2-confirm, .swal2-cancel, .swal2-deny {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+    }
+    .swal2-modal {
+        pointer-events: auto !important;
+    }
+    .swal2-container.swal2-backdrop-show {
+        background: rgba(0, 0, 0, 0.4) !important;
+    }
+`
+        document.head.appendChild(style)
+
+        return () => {
+            document.head.removeChild(style)
+        }
+    }, [])
+
     if (!isClient) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -500,7 +650,8 @@ export default function UsersPage() {
         )
     }
 
-    if (loading || rolesLoading) {
+    // Initial full-page loading for data and roles
+    if (loading && rolesLoading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-10 w-10 animate-spin text-black" />
@@ -516,7 +667,16 @@ export default function UsersPage() {
                     <h1 className="text-3xl font-bold text-gray-900">İstifadəçilər</h1>
                     <p className="mt-2 text-gray-600">İstifadəçi məlumatlarını idarə edin</p>
                 </div>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Dialog
+                    open={dialogOpen}
+                    onOpenChange={(openState) => {
+                        // Only update dialogOpen if we are not ignoring a close event
+                        if (ignoreDialogClose && !openState) {
+                            return // Ignore this close event
+                        }
+                        setDialogOpen(openState)
+                    }}
+                >
                     <DialogTrigger asChild>
                         <Button onClick={resetForm}>
                             <Plus className="mr-2 h-4 w-4" />
@@ -618,14 +778,14 @@ export default function UsersPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Rollar</Label>
+                                    <Label>Rollar *</Label>
                                     <MultiSelectRoles
                                         options={roles}
                                         selected={formData.roles} // Changed from roleIds to roles
                                         onSelect={(selectedIds) => setFormData({ ...formData, roles: selectedIds })} // Changed from roleIds to roles
                                         disabled={isSubmittingForm || rolesLoading}
                                         maxSelection={5}
-                                        placeholder="Rollar seçin (maks. 5)"
+                                        placeholder="Rollar seçin (Ən az 1, Ən çox 5)"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -920,12 +1080,33 @@ export default function UsersPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8">
-                                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                                            <p className="mt-2 text-sm text-gray-500">Məlumatlar yüklənir...</p>
-                                        </TableCell>
-                                    </TableRow>
+                                    // Skeleton rows for loading state
+                                    Array.from({ length: 5 }).map((_, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>
+                                                <Skeleton className="h-16 w-16 rounded-md" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[120px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[180px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[150px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[60px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex space-x-2">
+                                                    <Skeleton className="h-8 w-8 rounded-md" />
+                                                    <Skeleton className="h-8 w-8 rounded-md" />
+                                                    <Skeleton className="h-8 w-8 rounded-md" />
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
                                 ) : users.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center py-8">
