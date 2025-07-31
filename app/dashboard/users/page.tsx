@@ -1,7 +1,5 @@
 "use client"
-
 import { DialogTrigger } from "@/components/ui/dialog"
-
 import type React from "react"
 import { Eye, Search, RotateCcw, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
@@ -85,7 +83,7 @@ export default function UsersPage() {
         birthDate: "",
         active: true,
         photoUrl: "",
-        roleIds: [] as number[],
+        roles: [] as number[], // Changed from roleIds to roles
     })
 
     const [isClient, setIsClient] = useState(false)
@@ -238,14 +236,17 @@ export default function UsersPage() {
         if (typeof window === "undefined") return
         const token = localStorage.getItem("token")
         if (!token) return
+
         setIsSubmittingForm(true)
         try {
             const url = editingUser ? `http://localhost:8080/api/users/${editingUser.id}` : "http://localhost:8080/api/users"
             const method = editingUser ? "PUT" : "POST"
             const data = new FormData()
+
             data.append("username", formData.username)
             data.append("email", formData.email)
             data.append("active", String(formData.active))
+
             if (formData.password) data.append("password", formData.password)
             if (formData.fullName) data.append("fullName", formData.fullName)
             if (formData.phone) data.append("phone", formData.phone)
@@ -253,8 +254,9 @@ export default function UsersPage() {
             if (formData.gender) data.append("gender", formData.gender)
             if (formData.birthDate) data.append("birthDate", formData.birthDate)
 
-            formData.roleIds.forEach((roleId) => {
-                data.append("roleIds", String(roleId))
+            // Changed from roleIds to roles
+            formData.roles.forEach((roleId) => {
+                data.append("roles", String(roleId))
             })
 
             if (imageFile) {
@@ -297,7 +299,8 @@ export default function UsersPage() {
                 if (responseData.errors) {
                     const errorMessages = Object.entries(responseData.errors)
                         .map(([key, value]) => {
-                            if (key === "roleIds") {
+                            // Updated to handle "roles" instead of "roleIds"
+                            if (key === "roles") {
                                 return `Rollar: ${value}`
                             }
                             return `${key}: ${value}`
@@ -347,12 +350,14 @@ export default function UsersPage() {
     const handleEdit = async (user: User) => {
         const fetchedUser = await fetchUserById(user.id)
         if (fetchedUser) {
-            const selectedroles = fetchedUser.roles
+            const selectedRoles = fetchedUser.roles
                 .map((roleName) => roles.find((r) => r.name === roleName)?.id)
                 .filter((id): id is number => id !== undefined)
+
             console.log("Fetched user roles:", fetchedUser.roles)
             console.log("Available roles:", roles)
-            console.log("Selected role IDs:", selectedroles)
+            console.log("Selected role IDs:", selectedRoles)
+
             setEditingUser(fetchedUser)
             setFormData({
                 username: fetchedUser.username,
@@ -365,7 +370,7 @@ export default function UsersPage() {
                 birthDate: fetchedUser.birthDate || "",
                 active: fetchedUser.active,
                 photoUrl: fetchedUser.photoUrl || "",
-                roleIds: selectedroles,
+                roles: selectedRoles, // Changed from roleIds to roles
             })
             setImageFile(null)
             setDialogOpen(true)
@@ -411,6 +416,7 @@ export default function UsersPage() {
         if (typeof window === "undefined") return
         const token = localStorage.getItem("token")
         if (!token) return
+
         setDeletingId(id)
         try {
             const response = await fetch(`http://localhost:8080/api/users/${id}`, {
@@ -465,7 +471,7 @@ export default function UsersPage() {
             birthDate: "",
             active: true,
             photoUrl: "",
-            roleIds: [],
+            roles: [], // Changed from roleIds to roles
         })
         setImageFile(null)
         setEditingUser(null)
@@ -615,8 +621,8 @@ export default function UsersPage() {
                                     <Label>Rollar</Label>
                                     <MultiSelectRoles
                                         options={roles}
-                                        selected={formData.roleIds}
-                                        onSelect={(selectedIds) => setFormData({ ...formData, roleIds: selectedIds })}
+                                        selected={formData.roles} // Changed from roleIds to roles
+                                        onSelect={(selectedIds) => setFormData({ ...formData, roles: selectedIds })} // Changed from roleIds to roles
                                         disabled={isSubmittingForm || rolesLoading}
                                         maxSelection={5}
                                         placeholder="Rollar seçin (maks. 5)"
