@@ -13,7 +13,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Edit, Trash2, Search, Loader2, RotateCcw } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Loader2, RotateCcw } from 'lucide-react'
 import Swal from "sweetalert2"
 import { FloatingLabelInput } from "@/components/floating-label-input"
 
@@ -31,6 +31,70 @@ interface ApiResponse {
     data?: any
 }
 
+// SweetAlert konfiqurasiyası
+const swalConfig = {
+    customClass: {
+        container: "swal-container",
+        popup: "swal-popup",
+        header: "swal-header",
+        title: "swal-title",
+        closeButton: "swal-close-button",
+        icon: "swal-icon",
+        image: "swal-image",
+        content: "swal-content",
+        htmlContainer: "swal-html-container",
+        input: "swal-input",
+        inputLabel: "swal-input-label",
+        validationMessage: "swal-validation-message",
+        actions: "swal-actions",
+        confirmButton: "swal-confirm-button",
+        denyButton: "swal-deny-button",
+        cancelButton: "swal-cancel-button",
+        loader: "swal-loader",
+        footer: "swal-footer",
+        timerProgressBar: "swal-timer-progress-bar",
+    },
+    backdrop: true,
+    allowOutsideClick: true,
+    allowEscapeKey: true,
+    stopKeydownPropagation: true,
+    keydownListenerCapture: false,
+    showConfirmButton: true,
+    showDenyButton: false,
+    showCancelButton: false,
+    confirmButtonText: "OK",
+    returnFocus: true,
+    focusConfirm: true,
+    focusDeny: true,
+    focusCancel: true,
+    heightAuto: true,
+    padding: "1.25rem",
+    width: "32rem",
+    position: "center",
+}
+
+// SweetAlert helper funksiyası
+const showSwal = (options: any) => {
+    return Swal.fire({
+        ...swalConfig,
+        ...options,
+        didOpen: () => {
+            const confirmButton = document.querySelector(".swal2-confirm") as HTMLElement
+            if (confirmButton) {
+                confirmButton.focus()
+            }
+            if (options.didOpenCustom) {
+                options.didOpenCustom()
+            }
+        },
+        willClose: () => {
+            if (options.willCloseCustom) {
+                options.willCloseCustom()
+            }
+        },
+    })
+}
+
 export default function CurrenciesPage() {
     const [currencies, setCurrencies] = useState<Currency[]>([])
     const [loading, setLoading] = useState(true)
@@ -41,6 +105,7 @@ export default function CurrenciesPage() {
     const [formData, setFormData] = useState({ code: "", name: "", symbol: "" })
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
+    const [ignoreDialogClose, setIgnoreDialogClose] = useState(false) // New state for ignoring dialog close
 
     const fetchCurrencies = useCallback(async (filterParams: { code?: string; name?: string }) => {
         const token = localStorage.getItem("token")
@@ -62,11 +127,15 @@ export default function CurrenciesPage() {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("Valyutaları çəkərkən xəta:", response.status, errorData)
-                await Swal.fire({
+                await showSwal({
                     title: "Xəta!",
                     text: errorData.message || errorData.error || `Valyutalar yüklənmədi: Status ${response.status}`,
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setIgnoreDialogClose(false),
                 })
                 setCurrencies([])
                 return
@@ -76,11 +145,15 @@ export default function CurrenciesPage() {
             setCurrencies(Array.isArray(data) ? data : [])
         } catch (error) {
             console.error("Valyutaları çəkərkən bağlantı xətası:", error)
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setIgnoreDialogClose(false),
             })
             setCurrencies([])
         } finally {
@@ -127,7 +200,7 @@ export default function CurrenciesPage() {
                 responseData = {}
             }
             if (response.ok) {
-                await Swal.fire({
+                await showSwal({
                     title: "Uğurlu!",
                     text: editingCurrency ? "Valyuta uğurla yeniləndi" : "Valyuta uğurla əlavə edildi",
                     icon: "success",
@@ -139,19 +212,27 @@ export default function CurrenciesPage() {
                 resetForm()
                 fetchCurrencies({})
             } else {
-                await Swal.fire({
+                await showSwal({
                     title: "Xəta!",
                     text: responseData.message || responseData.error || "Əməliyyat uğursuz oldu",
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setIgnoreDialogClose(false),
                 })
             }
         } catch (error) {
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setIgnoreDialogClose(false),
             })
         } finally {
             setIsSubmittingForm(false)
@@ -165,7 +246,7 @@ export default function CurrenciesPage() {
     }
 
     const handleDelete = async (id: number) => {
-        const result = await Swal.fire({
+        const result = await showSwal({
             title: "Əminsiniz?",
             text: "Bu valyutanı silmək istədiyinizə əminsiniz? Bu əməliyyat geri alına bilməz!",
             icon: "warning",
@@ -186,7 +267,7 @@ export default function CurrenciesPage() {
                 headers: { Authorization: `Bearer ${token}` },
             })
             if (response.ok) {
-                await Swal.fire({
+                await showSwal({
                     title: "Silindi!",
                     text: "Valyuta uğurla silindi",
                     icon: "success",
@@ -202,19 +283,27 @@ export default function CurrenciesPage() {
                 } catch (e) {
                     responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
                 }
-                await Swal.fire({
+                await showSwal({
                     title: "Xəta!",
                     text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setIgnoreDialogClose(false),
                 })
             }
         } catch (error) {
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setIgnoreDialogClose(false),
             })
         } finally {
             setDeletingId(null)
@@ -225,6 +314,39 @@ export default function CurrenciesPage() {
         setFormData({ code: "", name: "", symbol: "" })
         setEditingCurrency(null)
     }
+
+    useEffect(() => {
+        // SweetAlert CSS stilləri
+        const style = document.createElement("style")
+        style.textContent = `
+        .swal-container, .swal2-container {
+            z-index: 10000 !important;
+            position: fixed !important;
+        }
+        .swal-popup, .swal2-popup {
+            z-index: 10001 !important;
+            position: relative !important;
+        }
+        .swal2-backdrop-show {
+            z-index: 9999 !important;
+        }
+        .swal2-confirm, .swal2-cancel, .swal2-deny {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+        .swal2-modal {
+            pointer-events: auto !important;
+        }
+        .swal2-container.swal2-backdrop-show {
+            background: rgba(0, 0, 0, 0.4) !important;
+        }
+    `
+        document.head.appendChild(style)
+
+        return () => {
+            document.head.removeChild(style)
+        }
+    }, [])
 
     if (loading) {
         return (
@@ -241,7 +363,15 @@ export default function CurrenciesPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Valyutalar</h1>
                     <p className="mt-2 text-gray-600">Valyuta məlumatlarını idarə edin</p>
                 </div>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Dialog
+                    open={dialogOpen}
+                    onOpenChange={(openState) => {
+                        if (ignoreDialogClose && !openState) {
+                            return // Ignore this close event
+                        }
+                        setDialogOpen(openState)
+                    }}
+                >
                     <DialogTrigger asChild>
                         <Button onClick={resetForm}>
                             <Plus className="mr-2 h-4 w-4" />

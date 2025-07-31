@@ -1,6 +1,6 @@
 "use client"
 import type React from "react"
-import { Eye, Search, RotateCcw, RefreshCw } from "lucide-react"
+import { Eye, Search, RotateCcw, RefreshCw } from 'lucide-react'
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -18,10 +18,11 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Loader2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Swal from "sweetalert2"
 import { FloatingLabelInput } from "@/components/floating-label-input"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Product {
     id: number
@@ -58,6 +59,70 @@ interface ApiResponse {
     data?: any
 }
 
+// SweetAlert konfiqurasiyası
+const swalConfig = {
+    customClass: {
+        container: "swal-container",
+        popup: "swal-popup",
+        header: "swal-header",
+        title: "swal-title",
+        closeButton: "swal-close-button",
+        icon: "swal-icon",
+        image: "swal-image",
+        content: "swal-content",
+        htmlContainer: "swal-html-container",
+        input: "swal-input",
+        inputLabel: "swal-input-label",
+        validationMessage: "swal-validation-message",
+        actions: "swal-actions",
+        confirmButton: "swal-confirm-button",
+        denyButton: "swal-deny-button",
+        cancelButton: "swal-cancel-button",
+        loader: "swal-loader",
+        footer: "swal-footer",
+        timerProgressBar: "swal-timer-progress-bar",
+    },
+    backdrop: true,
+    allowOutsideClick: true,
+    allowEscapeKey: true,
+    stopKeydownPropagation: true,
+    keydownListenerCapture: false,
+    showConfirmButton: true,
+    showDenyButton: false,
+    showCancelButton: false,
+    confirmButtonText: "OK",
+    returnFocus: true,
+    focusConfirm: true,
+    focusDeny: true,
+    focusCancel: true,
+    heightAuto: true,
+    padding: "1.25rem",
+    width: "32rem",
+    position: "center",
+}
+
+// SweetAlert helper funksiyası
+const showSwal = (options: any) => {
+    return Swal.fire({
+        ...swalConfig,
+        ...options,
+        didOpen: () => {
+            const confirmButton = document.querySelector(".swal2-confirm") as HTMLElement
+            if (confirmButton) {
+                confirmButton.focus()
+            }
+            if (options.didOpenCustom) {
+                options.didOpenCustom()
+            }
+        },
+        willClose: () => {
+            if (options.willCloseCustom) {
+                options.willCloseCustom()
+            }
+        },
+    })
+}
+
 export default function ProductsPage() {
     const [products, setProducts] = useState<Product[]>([])
     const [categories, setCategories] = useState<ProductCategory[]>([])
@@ -71,6 +136,7 @@ export default function ProductsPage() {
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
     const [imageFile, setImageFile] = useState<File | null>(null)
+    const [ignoreDialogClose, setIgnoreDialogClose] = useState(false) // New state for dialog control
 
     // Filter states
     const [filterName, setFilterName] = useState("")
@@ -137,11 +203,15 @@ export default function ProductsPage() {
             if (!productsRes.ok) {
                 const errorData = await productsRes.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("Məhsulları çəkərkən xəta:", productsRes.status, errorData)
-                await Swal.fire({
+                await showSwal({
                     title: "Xəta!",
                     text: errorData.message || errorData.error || `Məhsullar yüklənmədi: Status ${productsRes.status}`,
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false, // Prevent closing on outside click
+                    allowEscapeKey: false, // Prevent closing on escape key
+                    didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                    willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
                 })
                 setProducts([])
                 setCategories([])
@@ -177,11 +247,15 @@ export default function ProductsPage() {
             setUnits(Array.isArray(unitsData) ? unitsData : [])
         } catch (error) {
             console.error("Məlumatları çəkərkən bağlantı xətası:", error)
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Prevent closing on outside click
+                allowEscapeKey: false, // Prevent closing on escape key
+                didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
             })
             setProducts([])
             setCategories([])
@@ -280,7 +354,7 @@ export default function ProductsPage() {
             }
 
             if (response.ok) {
-                await Swal.fire({
+                await showSwal({
                     title: "Uğurlu!",
                     text: editingProduct ? "Məhsul uğurla yeniləndi" : "Məhsul uğurla əlavə edildi",
                     icon: "success",
@@ -288,23 +362,31 @@ export default function ProductsPage() {
                     timer: 2000,
                     timerProgressBar: true,
                 })
-                setDialogOpen(false)
+                setDialogOpen(false) // Close dialog only on success
                 resetForm()
                 await fetchData({})
             } else {
-                await Swal.fire({
+                await showSwal({
                     title: "Xəta!",
                     text: responseData.message || responseData.error || "Əməliyyat uğursuz oldu",
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false, // Prevent closing on outside click
+                    allowEscapeKey: false, // Prevent closing on escape key
+                    didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                    willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
                 })
             }
         } catch (error) {
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Prevent closing on outside click
+                allowEscapeKey: false, // Prevent closing on escape key
+                didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
             })
         } finally {
             setIsSubmittingForm(false)
@@ -350,11 +432,15 @@ export default function ProductsPage() {
             setImageFile(null)
             setDialogOpen(true)
         } else {
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Məhsul məlumatları yüklənə bilmədi.",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Prevent closing on outside click
+                allowEscapeKey: false, // Prevent closing on escape key
+                didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
             })
         }
     }
@@ -365,17 +451,21 @@ export default function ProductsPage() {
             setSelectedProduct(fetchedProduct)
             setDetailsDialogOpen(true)
         } else {
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Məhsul məlumatları yüklənə bilmədi.",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Prevent closing on outside click
+                allowEscapeKey: false, // Prevent closing on escape key
+                didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
             })
         }
     }
 
     const handleDelete = async (id: number) => {
-        const result = await Swal.fire({
+        const result = await showSwal({
             title: "Əminsiniz?",
             text: "Bu məhsulu silmək istədiyinizə əminsiniz? Bu əməliyyat geri alına bilməz!",
             icon: "warning",
@@ -400,7 +490,7 @@ export default function ProductsPage() {
             })
 
             if (response.ok) {
-                await Swal.fire({
+                await showSwal({
                     title: "Silindi!",
                     text: "Məhsul uğurla silindi",
                     icon: "success",
@@ -416,19 +506,27 @@ export default function ProductsPage() {
                 } catch (e) {
                     responseData = { message: "Silmə əməliyyatı uğursuz oldu" }
                 }
-                await Swal.fire({
+                await showSwal({
                     title: "Xəta!",
                     text: responseData.message || responseData.error || "Silmə əməliyyatı uğursuz oldu",
                     icon: "error",
                     confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false, // Prevent closing on outside click
+                    allowEscapeKey: false, // Prevent closing on escape key
+                    didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                    willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
                 })
             }
         } catch (error) {
-            await Swal.fire({
+            await showSwal({
                 title: "Xəta!",
                 text: "Bağlantı xətası baş verdi",
                 icon: "error",
                 confirmButtonColor: "#ef4444",
+                allowOutsideClick: false, // Prevent closing on outside click
+                allowEscapeKey: false, // Prevent closing on escape key
+                didOpenCustom: () => setIgnoreDialogClose(true), // Set flag when SweetAlert opens
+                willCloseCustom: () => setIgnoreDialogClose(false), // Reset flag after SweetAlert closes
             })
         } finally {
             setDeletingId(null)
@@ -450,6 +548,39 @@ export default function ProductsPage() {
         setImageFile(null)
         setEditingProduct(null)
     }
+
+    useEffect(() => {
+        // SweetAlert CSS stilləri
+        const style = document.createElement("style")
+        style.textContent = `
+        .swal-container, .swal2-container {
+            z-index: 10000 !important;
+            position: fixed !important;
+        }
+        .swal-popup, .swal2-popup {
+            z-index: 10001 !important;
+            position: relative !important;
+        }
+        .swal2-backdrop-show {
+            z-index: 9999 !important;
+        }
+        .swal2-confirm, .swal2-cancel, .swal2-deny {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+        .swal2-modal {
+            pointer-events: auto !important;
+        }
+        .swal2-container.swal2-backdrop-show {
+            background: rgba(0, 0, 0, 0.4) !important;
+        }
+    `
+        document.head.appendChild(style)
+
+        return () => {
+            document.head.removeChild(style)
+        }
+    }, [])
 
     if (!isClient) {
         return (
@@ -481,7 +612,15 @@ export default function ProductsPage() {
                     <h1 className="text-3xl font-bold text-gray-900">Məhsullar</h1>
                     <p className="mt-2 text-gray-600">Məhsulları idarə edin</p>
                 </div>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Dialog
+                    open={dialogOpen}
+                    onOpenChange={(openState) => {
+                        if (ignoreDialogClose && !openState) {
+                            return // Ignore this close event
+                        }
+                        setDialogOpen(openState)
+                    }}
+                >
                     <DialogTrigger asChild>
                         <Button onClick={resetForm}>
                             <Plus className="mr-2 h-4 w-4" />
@@ -939,12 +1078,33 @@ export default function ProductsPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8">
-                                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                                            <p className="mt-2 text-sm text-gray-500">Məlumatlar yüklənir...</p>
-                                        </TableCell>
-                                    </TableRow>
+                                    // Skeleton loading rows
+                                    Array.from({ length: 5 }).map((_, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>
+                                                <Skeleton className="size-16 rounded-md" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[150px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[100px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-[80px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-6 w-[70px]" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex space-x-2">
+                                                    <Skeleton className="size-8" />
+                                                    <Skeleton className="size-8" />
+                                                    <Skeleton className="size-8" />
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
                                 ) : products.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center py-8">
