@@ -1,6 +1,6 @@
 "use client"
 import type React from "react"
-import { Eye, Search, RotateCcw, RefreshCw } from 'lucide-react'
+import { Eye, Search, RotateCcw, RefreshCw } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -18,7 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Swal from "sweetalert2"
 import { FloatingLabelInput } from "@/components/floating-label-input"
@@ -128,6 +128,7 @@ export default function ProductsPage() {
     const [categories, setCategories] = useState<ProductCategory[]>([])
     const [brands, setBrands] = useState<ProductBrand[]>([])
     const [units, setUnits] = useState<ProductUnit[]>([])
+    const [defaultCurrency, setDefaultCurrency] = useState<string>("")
     const [loading, setLoading] = useState(true)
     const [dialogOpen, setDialogOpen] = useState(false)
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
@@ -173,6 +174,36 @@ export default function ProductsPage() {
             result += characters.charAt(Math.floor(Math.random() * charactersLength))
         }
         return result
+    }
+
+    // Fetch default currency from settings
+    const fetchDefaultCurrency = useCallback(async () => {
+        if (typeof window === "undefined") return
+        const token = localStorage.getItem("token")
+        if (!token) return
+
+        try {
+            const response = await fetch("http://localhost:8080/api/settings", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            })
+
+            if (response.ok) {
+                const settings = await response.json()
+                const currencySetting = settings.find((setting: any) => setting.key === "default_currency")
+                if (currencySetting) {
+                    setDefaultCurrency(currencySetting.value)
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching default currency:", error)
+        }
+    }, [])
+
+    // Format price with currency
+    const formatPrice = (price: number) => {
+        return `${price}${defaultCurrency ? ` ${defaultCurrency}` : ""}`
     }
 
     const fetchData = useCallback(async (filterParams: Record<string, any> = {}) => {
@@ -275,8 +306,9 @@ export default function ProductsPage() {
     useEffect(() => {
         if (isClient && hasToken) {
             fetchData({})
+            fetchDefaultCurrency()
         }
-    }, [isClient, hasToken, fetchData])
+    }, [isClient, hasToken, fetchData, fetchDefaultCurrency])
 
     const handleFilter = () => {
         const filterParams: Record<string, any> = {}
@@ -648,7 +680,7 @@ export default function ProductsPage() {
                                     <div className="col-span-3 space-y-2">
                                         <FloatingLabelInput
                                             id="product-price"
-                                            label="Qiymət *"
+                                            label={`Qiymət${defaultCurrency ? ` (${defaultCurrency})` : ""} *`}
                                             type="number"
                                             step="0.01"
                                             value={formData.price}
@@ -857,7 +889,7 @@ export default function ProductsPage() {
                                         </div>
                                         <div>
                                             <Label className="text-sm font-medium text-gray-500">Qiymət</Label>
-                                            <p className="text-lg font-bold text-green-600">{selectedProduct.price}</p>
+                                            <p className="text-lg font-bold text-green-600">{formatPrice(selectedProduct.price)}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-sm font-medium text-gray-500">Status</Label>
@@ -970,7 +1002,7 @@ export default function ProductsPage() {
                             <div className="space-y-2">
                                 <FloatingLabelInput
                                     id="filterMinPrice"
-                                    label="Ən az qiymət"
+                                    label={`Ən az qiymət${defaultCurrency ? ` (${defaultCurrency})` : ""}`}
                                     type="number"
                                     step="0.01"
                                     value={filterMinPrice}
@@ -980,7 +1012,7 @@ export default function ProductsPage() {
                             <div className="space-y-2">
                                 <FloatingLabelInput
                                     id="filterMaxPrice"
-                                    label="Ən çox qiymət"
+                                    label={`Ən çox qiymət${defaultCurrency ? ` (${defaultCurrency})` : ""}`}
                                     type="number"
                                     step="0.01"
                                     value={filterMaxPrice}
@@ -1125,7 +1157,7 @@ export default function ProductsPage() {
                                             </TableCell>
                                             <TableCell className="font-medium">{product.name}</TableCell>
                                             <TableCell>{product.sku || "N/A"}</TableCell>
-                                            <TableCell className="font-semibold text-green-600">{product.price}</TableCell>
+                                            <TableCell className="font-semibold text-green-600">{formatPrice(product.price)}</TableCell>
                                             <TableCell>
                                                 <Badge variant={product.active ? "default" : "secondary"}>
                                                     {product.active ? "Aktiv" : "Deaktiv"}

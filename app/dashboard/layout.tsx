@@ -1,16 +1,27 @@
 "use client"
 
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Menu, ShoppingBag, Package, Tags, Layers, Scale, LogOut, Home, Currency, Users, UserRound } from "lucide-react"
+import {
+    Menu,
+    ShoppingBag,
+    Package,
+    Tags,
+    Layers,
+    Scale,
+    LogOut,
+    Home,
+    Currency,
+    Users,
+    UserRound,
+    Settings,
+} from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,6 +29,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
+interface Setting {
+    key: string
+    value: string
+    description: string
+}
 
 const navigation = [
     { name: "Ana səhifə", href: "/dashboard", icon: Home },
@@ -30,6 +47,7 @@ const navigation = [
     { name: "Brendlər", href: "/dashboard/product-brands", icon: Layers },
     { name: "Ölçü vahidləri", href: "/dashboard/product-units", icon: Scale },
     { name: "Valyutalar", href: "/dashboard/currencies", icon: Currency },
+    { name: "Tənzimləmələr", href: "/dashboard/settings", icon: Settings },
 ]
 
 export default function DashboardLayout({
@@ -41,6 +59,7 @@ export default function DashboardLayout({
     const pathname = usePathname()
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [username, setUsername] = useState("")
+    const [appName, setAppName] = useState("IMS") // Default fallback
 
     useEffect(() => {
         const token = localStorage.getItem("token")
@@ -50,6 +69,29 @@ export default function DashboardLayout({
             router.push("/login")
         } else {
             setUsername(storedUsername || "İstifadəçi")
+
+            // Fetch app_short_name from settings
+            fetch("http://localhost:8080/api/settings", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            })
+                .then((res) => {
+                    if (res.ok) {
+                        return res.json()
+                    }
+                    throw new Error("Failed to fetch settings")
+                })
+                .then((settingsData: Setting[]) => {
+                    const appShortNameSetting = settingsData.find((setting) => setting.key === "app_short_name")
+                    if (appShortNameSetting && appShortNameSetting.value) {
+                        setAppName(appShortNameSetting.value)
+                    }
+                })
+                .catch((error) => {
+                    console.warn("Failed to fetch app name from settings, using default:", error)
+                    // Keep default "IMS" if settings fetch fails
+                })
         }
     }, [router])
 
@@ -76,7 +118,7 @@ export default function DashboardLayout({
                     <div className="flex h-full flex-col">
                         <div className="flex h-16 items-center px-6 border-b">
                             <ShoppingBag className="h-8 w-8 text-blue-600" />
-                            <span className="ml-2 text-xl font-bold">IMS</span> {/* Admin Panel -> IMS */}
+                            <span className="ml-2 text-xl font-bold">{appName}</span>
                         </div>
                         <nav className="flex-1 space-y-1 px-3 py-4">
                             {navigation.map((item) => {
@@ -104,7 +146,7 @@ export default function DashboardLayout({
                     <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
                         <div className="flex h-16 items-center px-6 border-b">
                             <ShoppingBag className="h-8 w-8 text-blue-600" />
-                            <span className="ml-2 text-xl font-bold">IMS</span> {/* Admin Panel -> IMS */}
+                            <span className="ml-2 text-xl font-bold">{appName}</span>
                         </div>
                         <nav className="flex-1 space-y-1 px-3 py-4">
                             {navigation.map((item) => {
@@ -135,6 +177,7 @@ export default function DashboardLayout({
                                 <Menu className="h-6 w-6" />
                             </Button>
                         </SheetTrigger>
+
                         <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
                             <div className="flex flex-1"></div>
                             <div className="flex items-center gap-x-4 lg:gap-x-6">
