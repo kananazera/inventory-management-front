@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {Package, Tags, Layers, Scale, Currency, Users, UserRound} from "lucide-react"
+import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck } from "lucide-react"
 
 interface Stats {
   users: number
@@ -12,6 +12,8 @@ interface Stats {
   brands: number
   units: number
   currencies: number
+  customers: number
+  suppliers: number
 }
 
 export default function DashboardPage() {
@@ -23,6 +25,8 @@ export default function DashboardPage() {
     brands: 0,
     units: 0,
     currencies: 0,
+    customers: 0,
+    suppliers: 0,
   })
 
   useEffect(() => {
@@ -31,7 +35,17 @@ export default function DashboardPage() {
       if (!token) return
 
       try {
-        const [usersRes, rolesRes, productsRes, categoriesRes, brandsRes, unitsRes, currenciesRes] = await Promise.all([
+        const [
+          usersRes,
+          rolesRes,
+          productsRes,
+          categoriesRes,
+          brandsRes,
+          unitsRes,
+          currenciesRes,
+          customersRes,
+          suppliersRes,
+        ] = await Promise.all([
           fetch("http://localhost:8080/api/users", {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -53,17 +67,27 @@ export default function DashboardPage() {
           fetch("http://localhost:8080/api/currencies", {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch("http://localhost:8080/api/customers", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("http://localhost:8080/api/suppliers", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ])
 
-        const [users, roles, products, categories, brands, units, currencies] = await Promise.all([
-          usersRes.json(),
-          rolesRes.json(),
-          productsRes.json(),
-          categoriesRes.json(),
-          brandsRes.json(),
-          unitsRes.json(),
-          currenciesRes.json(),
-        ])
+        const [users, roles, products, categories, brands, units, currencies, customers, suppliers] = await Promise.all(
+            [
+              usersRes.json(),
+              rolesRes.json(),
+              productsRes.json(),
+              categoriesRes.json(),
+              brandsRes.json(),
+              unitsRes.json(),
+              currenciesRes.json(),
+              customersRes.json(),
+              suppliersRes.json(),
+            ],
+        )
 
         setStats({
           users: users.length || 0,
@@ -73,6 +97,8 @@ export default function DashboardPage() {
           brands: brands.length || 0,
           units: units.length || 0,
           currencies: currencies.length || 0,
+          customers: customers.length || 0,
+          suppliers: suppliers.length || 0,
         })
       } catch (error) {
         console.error("Statistika yüklənmədi:", error)
@@ -132,7 +158,21 @@ export default function DashboardPage() {
       color: "text-red-600",
       bgColor: "bg-red-100",
     },
-  ];
+    {
+      title: "Müştərilər",
+      value: stats.customers,
+      icon: UserCheck,
+      color: "text-orange-600",
+      bgColor: "bg-orange-100",
+    },
+    {
+      title: "Təchizatçılar",
+      value: stats.suppliers,
+      icon: Truck,
+      color: "text-teal-600",
+      bgColor: "bg-teal-100",
+    },
+  ]
 
   return (
       <div>
@@ -161,9 +201,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent>
               <div className="space-y-4">
-                <p className="text-gray-600 pt-4">
-                  Burada başqa statistikalar olacaq
-                </p>
+                <p className="text-gray-600 pt-4">Burada başqa statistikalar olacaq</p>
               </div>
             </CardContent>
           </Card>
