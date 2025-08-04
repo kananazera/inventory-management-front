@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,12 +10,44 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, ShoppingBag } from "lucide-react"
 import { FloatingLabelInput } from "@/components/floating-label-input"
 
+interface Setting {
+  key: string
+  value: string
+  description: string
+}
+
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [appName, setAppName] = useState("Inventory Management System") // Default fallback
   const router = useRouter()
+
+  useEffect(() => {
+    // Fetch app_name from settings
+    fetch("http://localhost:8080/api/settings", {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+        .then((res) => {
+          if (res.ok) {
+            return res.json()
+          }
+          throw new Error("Failed to fetch settings")
+        })
+        .then((settingsData: Setting[]) => {
+          const appNameSetting = settingsData.find((setting) => setting.key === "app_name")
+          if (appNameSetting && appNameSetting.value) {
+            setAppName(appNameSetting.value)
+          }
+        })
+        .catch((error) => {
+          console.warn("Failed to fetch app name from settings, using default:", error)
+          // Keep default "Inventory Management System" if settings fetch fails
+        })
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,8 +85,7 @@ export default function LoginPage() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
               <ShoppingBag className="h-6 w-6 text-blue-600" />
             </div>
-            <CardTitle className="text-2xl font-bold">Inventory management system</CardTitle>{" "}
-            {/* "Giriş" -> "Inventory Management System" */}
+            <CardTitle className="text-2xl font-bold">{appName}</CardTitle>
             <CardDescription>Hesabınıza daxil olun</CardDescription>
           </CardHeader>
           <CardContent>

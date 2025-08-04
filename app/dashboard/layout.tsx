@@ -21,6 +21,7 @@ import {
     Users,
     UserRound,
     Settings,
+    FileText,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -43,6 +44,7 @@ const navigation = [
     { name: "Təchizatçılar", href: "/dashboard/suppliers", icon: Package },
     { name: "Müştərilər", href: "/dashboard/customers", icon: ShoppingBag },
     { name: "Məhsullar", href: "/dashboard/products", icon: Package },
+    { name: "Müqavilələr", href: "/dashboard/contracts", icon: FileText },
     { name: "Kateqoriyalar", href: "/dashboard/product-categories", icon: Tags },
     { name: "Brendlər", href: "/dashboard/product-brands", icon: Layers },
     { name: "Ölçü vahidləri", href: "/dashboard/product-units", icon: Scale },

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck } from "lucide-react"
+import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck, FileText } from "lucide-react"
 
 interface Stats {
   users: number
@@ -14,6 +14,7 @@ interface Stats {
   currencies: number
   customers: number
   suppliers: number
+  contracts: number
 }
 
 export default function DashboardPage() {
@@ -27,6 +28,7 @@ export default function DashboardPage() {
     currencies: 0,
     customers: 0,
     suppliers: 0,
+    contracts: 0,
   })
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function DashboardPage() {
           currenciesRes,
           customersRes,
           suppliersRes,
+          contractsRes,
         ] = await Promise.all([
           fetch("http://localhost:8080/api/users", {
             headers: { Authorization: `Bearer ${token}` },
@@ -73,10 +76,18 @@ export default function DashboardPage() {
           fetch("http://localhost:8080/api/suppliers", {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch("http://localhost:8080/api/contracts/filter", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({}),
+          }),
         ])
 
-        const [users, roles, products, categories, brands, units, currencies, customers, suppliers] = await Promise.all(
-            [
+        const [users, roles, products, categories, brands, units, currencies, customers, suppliers, contracts] =
+            await Promise.all([
               usersRes.json(),
               rolesRes.json(),
               productsRes.json(),
@@ -86,8 +97,8 @@ export default function DashboardPage() {
               currenciesRes.json(),
               customersRes.json(),
               suppliersRes.json(),
-            ],
-        )
+              contractsRes.json(),
+            ])
 
         setStats({
           users: users.length || 0,
@@ -99,6 +110,7 @@ export default function DashboardPage() {
           currencies: currencies.length || 0,
           customers: customers.length || 0,
           suppliers: suppliers.length || 0,
+          contracts: contracts.length || 0,
         })
       } catch (error) {
         console.error("Statistika yüklənmədi:", error)
@@ -171,6 +183,13 @@ export default function DashboardPage() {
       icon: Truck,
       color: "text-teal-600",
       bgColor: "bg-teal-100",
+    },
+    {
+      title: "Müqavilələr",
+      value: stats.contracts,
+      icon: FileText,
+      color: "text-cyan-600",
+      bgColor: "bg-cyan-100",
     },
   ]
 
