@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck, FileText } from "lucide-react"
+import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck, FileText, Receipt } from 'lucide-react'
 
 interface Stats {
   users: number
@@ -15,6 +15,7 @@ interface Stats {
   customers: number
   suppliers: number
   contracts: number
+  taxes: number
 }
 
 export default function DashboardPage() {
@@ -29,6 +30,7 @@ export default function DashboardPage() {
     customers: 0,
     suppliers: 0,
     contracts: 0,
+    taxes: 0,
   })
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export default function DashboardPage() {
           customersRes,
           suppliersRes,
           contractsRes,
+          taxesRes,
         ] = await Promise.all([
           fetch("http://localhost:8080/api/users", {
             headers: { Authorization: `Bearer ${token}` },
@@ -84,9 +87,12 @@ export default function DashboardPage() {
             },
             body: JSON.stringify({}),
           }),
+          fetch("http://localhost:8080/api/taxes", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ])
 
-        const [users, roles, products, categories, brands, units, currencies, customers, suppliers, contracts] =
+        const [users, roles, products, categories, brands, units, currencies, customers, suppliers, contracts, taxes] =
             await Promise.all([
               usersRes.json(),
               rolesRes.json(),
@@ -98,6 +104,7 @@ export default function DashboardPage() {
               customersRes.json(),
               suppliersRes.json(),
               contractsRes.json(),
+              taxesRes.json(),
             ])
 
         setStats({
@@ -111,6 +118,7 @@ export default function DashboardPage() {
           customers: customers.length || 0,
           suppliers: suppliers.length || 0,
           contracts: contracts.length || 0,
+          taxes: taxes.length || 0,
         })
       } catch (error) {
         console.error("Statistika yüklənmədi:", error)
@@ -169,6 +177,13 @@ export default function DashboardPage() {
       icon: Currency,
       color: "text-red-600",
       bgColor: "bg-red-100",
+    },
+    {
+      title: "Vergilər",
+      value: stats.taxes,
+      icon: Receipt,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100",
     },
     {
       title: "Müştərilər",

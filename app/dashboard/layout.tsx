@@ -8,21 +8,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-    Menu,
-    ShoppingBag,
-    Package,
-    Tags,
-    Layers,
-    Scale,
-    LogOut,
-    Home,
-    Currency,
-    Users,
-    UserRound,
-    Settings,
-    FileText,
-} from "lucide-react"
+import { Menu, ShoppingBag, Package, Tags, Layers, Scale, LogOut, Home, Currency, Users, UserRound, Settings, FileText, ShoppingCart, Warehouse, Receipt } from 'lucide-react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -45,10 +31,13 @@ const navigation = [
     { name: "Müştərilər", href: "/dashboard/customers", icon: ShoppingBag },
     { name: "Məhsullar", href: "/dashboard/products", icon: Package },
     { name: "Müqavilələr", href: "/dashboard/contracts", icon: FileText },
+    { name: "Alışlar", href: "/dashboard/purchases", icon: ShoppingCart },
     { name: "Kateqoriyalar", href: "/dashboard/product-categories", icon: Tags },
     { name: "Brendlər", href: "/dashboard/product-brands", icon: Layers },
     { name: "Ölçü vahidləri", href: "/dashboard/product-units", icon: Scale },
+    { name: "Vergilər", href: "/dashboard/taxes", icon: Receipt },
     { name: "Valyutalar", href: "/dashboard/currencies", icon: Currency },
+    { name: "Anbarlar", href: "/dashboard/warehouses", icon: Warehouse },
     { name: "Tənzimləmələr", href: "/dashboard/settings", icon: Settings },
 ]
 
@@ -118,11 +107,11 @@ export default function DashboardLayout({
                 {/* Mobile sidebar */}
                 <SheetContent side="left" className="w-64 p-0">
                     <div className="flex h-full flex-col">
-                        <div className="flex h-16 items-center px-6 border-b">
+                        <div className="flex h-16 items-center px-6 border-b flex-shrink-0">
                             <ShoppingBag className="h-8 w-8 text-blue-600" />
                             <span className="ml-2 text-xl font-bold">{appName}</span>
                         </div>
-                        <nav className="flex-1 space-y-1 px-3 py-4">
+                        <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4"> {/* Dəyişiklik burada: px-2 */}
                             {navigation.map((item) => {
                                 const isActive = pathname === item.href
                                 return (
@@ -144,30 +133,28 @@ export default function DashboardLayout({
                 </SheetContent>
 
                 {/* Desktop sidebar */}
-                <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-                    <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
-                        <div className="flex h-16 items-center px-6 border-b">
-                            <ShoppingBag className="h-8 w-8 text-blue-600" />
-                            <span className="ml-2 text-xl font-bold">{appName}</span>
-                        </div>
-                        <nav className="flex-1 space-y-1 px-3 py-4">
-                            {navigation.map((item) => {
-                                const isActive = pathname === item.href
-                                return (
-                                    <Link
-                                        key={item.name}
-                                        href={item.href}
-                                        className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                                            isActive ? "bg-blue-100 text-blue-700" : "text-gray-700 hover:bg-gray-100"
-                                        }`}
-                                    >
-                                        <item.icon className="mr-3 h-5 w-5" />
-                                        {item.name}
-                                    </Link>
-                                )
-                            })}
-                        </nav>
+                <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-white border-r border-gray-200">
+                    <div className="flex h-16 items-center px-6 border-b flex-shrink-0">
+                        <ShoppingBag className="h-8 w-8 text-blue-600" />
+                        <span className="ml-2 text-xl font-bold">{appName}</span>
                     </div>
+                    <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4"> {/* Dəyişiklik burada: px-2 */}
+                        {navigation.map((item) => {
+                            const isActive = pathname === item.href
+                            return (
+                                <Link
+                                    key={item.name}
+                                    href={item.href}
+                                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        isActive ? "bg-blue-100 text-blue-700" : "text-gray-700 hover:bg-gray-100"
+                                    }`}
+                                >
+                                    <item.icon className="mr-3 h-5 w-5" />
+                                    {item.name}
+                                </Link>
+                            )
+                        })}
+                    </nav>
                 </div>
 
                 {/* Main content */}
@@ -211,8 +198,8 @@ export default function DashboardLayout({
                                         <DropdownMenuSeparator />
                                         {/* Gələcəkdə profil yeniləmə və s. üçün yer */}
                                         {/* <DropdownMenuItem>
-                      Profil Yeniləmə
-                    </DropdownMenuItem> */}
+                    Profil Yeniləmə
+                  </DropdownMenuItem> */}
                                         <DropdownMenuItem onClick={handleLogout}>
                                             <LogOut className="mr-2 h-4 w-4" />
                                             Çıxış
