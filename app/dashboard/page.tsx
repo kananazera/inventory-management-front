@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck, FileText, Receipt } from 'lucide-react'
+import { Package, Tags, Layers, Scale, Currency, Users, UserRound, UserCheck, Truck, FileText, Receipt, ShoppingCart } from 'lucide-react'
 
 interface Stats {
   users: number
@@ -16,6 +16,8 @@ interface Stats {
   suppliers: number
   contracts: number
   taxes: number
+  purchases: number
+  expenses: number  // yeni əlavə
 }
 
 export default function DashboardPage() {
@@ -31,6 +33,8 @@ export default function DashboardPage() {
     suppliers: 0,
     contracts: 0,
     taxes: 0,
+    purchases: 0,
+    expenses: 0, // yeni əlavə
   })
 
   useEffect(() => {
@@ -51,6 +55,8 @@ export default function DashboardPage() {
           suppliersRes,
           contractsRes,
           taxesRes,
+          purchasesRes,
+          expensesRes, // yeni əlavə
         ] = await Promise.all([
           fetch("http://localhost:8080/api/users", {
             headers: { Authorization: `Bearer ${token}` },
@@ -90,22 +96,43 @@ export default function DashboardPage() {
           fetch("http://localhost:8080/api/taxes", {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch("http://localhost:8080/api/purchases", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("http://localhost:8080/api/expenses", {  // yeni əlavə
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ])
 
-        const [users, roles, products, categories, brands, units, currencies, customers, suppliers, contracts, taxes] =
-            await Promise.all([
-              usersRes.json(),
-              rolesRes.json(),
-              productsRes.json(),
-              categoriesRes.json(),
-              brandsRes.json(),
-              unitsRes.json(),
-              currenciesRes.json(),
-              customersRes.json(),
-              suppliersRes.json(),
-              contractsRes.json(),
-              taxesRes.json(),
-            ])
+        const [
+          users,
+          roles,
+          products,
+          categories,
+          brands,
+          units,
+          currencies,
+          customers,
+          suppliers,
+          contracts,
+          taxes,
+          purchases,
+          expenses, // yeni əlavə
+        ] = await Promise.all([
+          usersRes.json(),
+          rolesRes.json(),
+          productsRes.json(),
+          categoriesRes.json(),
+          brandsRes.json(),
+          unitsRes.json(),
+          currenciesRes.json(),
+          customersRes.json(),
+          suppliersRes.json(),
+          contractsRes.json(),
+          taxesRes.json(),
+          purchasesRes.json(),
+          expensesRes.json(), // yeni əlavə
+        ])
 
         setStats({
           users: users.length || 0,
@@ -119,6 +146,8 @@ export default function DashboardPage() {
           suppliers: suppliers.length || 0,
           contracts: contracts.length || 0,
           taxes: taxes.length || 0,
+          purchases: purchases.length || 0,
+          expenses: expenses.length || 0, // yeni əlavə
         })
       } catch (error) {
         console.error("Statistika yüklənmədi:", error)
@@ -206,6 +235,20 @@ export default function DashboardPage() {
       color: "text-cyan-600",
       bgColor: "bg-cyan-100",
     },
+    {
+      title: "Alışlar",
+      value: stats.purchases,
+      icon: ShoppingCart,
+      color: "text-slate-600",
+      bgColor: "bg-slate-100",
+    },
+    {
+      title: "Xərclər",
+      value: stats.expenses,
+      icon: Receipt,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+    },
   ]
 
   return (
@@ -235,7 +278,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent>
               <div className="space-y-4">
-                <p className="text-gray-600 pt-4">Burada başqa statistikalar olacaq</p>
+                <p className="text-gray-600 pt-4">Burada məbləğ göstəriciləri olacaq</p>
               </div>
             </CardContent>
           </Card>

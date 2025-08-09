@@ -38,6 +38,7 @@ const navigation = [
     { name: "Vergilər", href: "/dashboard/taxes", icon: Receipt },
     { name: "Valyutalar", href: "/dashboard/currencies", icon: Currency },
     { name: "Anbarlar", href: "/dashboard/warehouses", icon: Warehouse },
+    { name: "Xərclər", href: "/dashboard/expenses", icon: Receipt }, // Yeni əlavə
     { name: "Tənzimləmələr", href: "/dashboard/settings", icon: Settings },
 ]
 
@@ -111,7 +112,7 @@ export default function DashboardLayout({
                             <ShoppingBag className="h-8 w-8 text-blue-600" />
                             <span className="ml-2 text-xl font-bold">{appName}</span>
                         </div>
-                        <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4"> {/* Dəyişiklik burada: px-2 */}
+                        <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4">
                             {navigation.map((item) => {
                                 const isActive = pathname === item.href
                                 return (
@@ -138,7 +139,7 @@ export default function DashboardLayout({
                         <ShoppingBag className="h-8 w-8 text-blue-600" />
                         <span className="ml-2 text-xl font-bold">{appName}</span>
                     </div>
-                    <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4"> {/* Dəyişiklik burada: px-2 */}
+                    <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4">
                         {navigation.map((item) => {
                             const isActive = pathname === item.href
                             return (
@@ -189,17 +190,10 @@ export default function DashboardLayout({
                                     <DropdownMenuContent className="w-56" align="end" forceMount>
                                         <DropdownMenuLabel className="font-normal">
                                             <div className="flex flex-col space-y-1">
-                                                {/* <p className="text-sm font-medium leading-none">{username}</p> */}
-                                                <p className="text-xs leading-none text-muted-foreground">
-                                                    {/* Gələcəkdə email və ya digər məlumatlar üçün yer */}
-                                                </p>
+                                                <p className="text-xs leading-none text-muted-foreground"></p>
                                             </div>
                                         </DropdownMenuLabel>
                                         <DropdownMenuSeparator />
-                                        {/* Gələcəkdə profil yeniləmə və s. üçün yer */}
-                                        {/* <DropdownMenuItem>
-                    Profil Yeniləmə
-                  </DropdownMenuItem> */}
                                         <DropdownMenuItem onClick={handleLogout}>
                                             <LogOut className="mr-2 h-4 w-4" />
                                             Çıxış

@@ -1,7 +1,7 @@
 "use client"
 import { DialogTrigger } from "@/components/ui/dialog"
 import type React from "react"
-import { Eye, Search, RotateCcw, Plus, Trash2, Loader2, Package, Building2, Calendar } from 'lucide-react'
+import { Eye, Search, RotateCcw, Plus, Trash2, Loader2, Package, Building2, Calendar, Edit } from 'lucide-react'
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -105,6 +105,8 @@ interface Purchase {
     totalAmount: number
     paidAmount?: number
     remainingAmount?: number
+    paymentType?: string
+    paymentStatus?: string
     status: string
     notes?: string
     items: PurchaseItem[]
@@ -141,12 +143,122 @@ interface Setting {
     description: string
 }
 
+interface PurchaseFilterRequest {
+    id?: number
+    supplierId?: number
+    warehouseId?: number
+    status?: string
+    purchaseDate?: string
+    paymentStatus?: string
+    paymentType?: string
+    minTotalAmount?: number
+    maxTotalAmount?: number
+}
+
+const PAYMENT_TYPES = [
+    { value: "CASH", label: "Nəğd" },
+    { value: "CARD", label: "Kart" },
+    { value: "CREDIT", label: "Kredit" },
+    { value: "TRANSFER", label: "Köçürmə" },
+    { value: "BONUS", label: "Bonus" }
+]
+
+const PAYMENT_STATUSES = [
+    { value: "PAID", label: "Ödənilib" },
+    { value: "PARTIAL", label: "Qismən ödənilib" },
+    { value: "UNPAID", label: "Ödənilməyib" }
+]
+
+// Status options for creating new purchases (excluding RETURNED)
+const PURCHASE_STATUSES = [
+    { value: "PENDING", label: "Gözləyir" },
+    { value: "COMPLETED", label: "Tamamlandı" },
+    { value: "CANCELLED", label: "Ləğv edildi" }
+]
+
+// All status options for display purposes (including RETURNED)
+const ALL_PURCHASE_STATUSES = [
+    { value: "PENDING", label: "Gözləyir" },
+    { value: "COMPLETED", label: "Tamamlandı" },
+    { value: "CANCELLED", label: "Ləğv edildi" },
+    { value: "RETURNED", label: "Geri qaytarıldı" }
+]
+
+// Helper function to get status badge color
+const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+        case "PENDING":
+            return "secondary"
+        case "COMPLETED":
+            return "default"
+        case "CANCELLED":
+            return "destructive"
+        case "RETURNED":
+            return "outline"
+        default:
+            return "default"
+    }
+}
+
+// Helper function to get payment status badge color
+const getPaymentStatusBadgeVariant = (paymentStatus: string) => {
+    switch (paymentStatus) {
+        case "PAID":
+            return "default"
+        case "PARTIAL":
+            return "secondary"
+        case "UNPAID":
+            return "destructive"
+        default:
+            return "outline"
+    }
+}
+
+// Helper function to check if status can be updated
+const canUpdateStatus = (currentStatus: string) => {
+    return currentStatus === "PENDING"
+}
+
+// Helper function to get available status options for update
+const getAvailableStatusOptions = (currentStatus: string) => {
+    if (currentStatus === "PENDING") {
+        return [
+            { value: "COMPLETED", label: "Tamamlandı" },
+            { value: "CANCELLED", label: "Ləğv edildi" }
+        ]
+    }
+    return []
+}
+
+// Helper function to get payment status label
+const getPaymentStatusLabel = (paymentStatus?: string) => {
+    if (!paymentStatus) return "Təyin edilməyib"
+    const status = PAYMENT_STATUSES.find(s => s.value === paymentStatus)
+    return status ? status.label : paymentStatus
+}
+
+// Helper function to get payment type label
+const getPaymentTypeLabel = (paymentType?: string) => {
+    if (!paymentType) return "Seçilməyib"
+    const type = PAYMENT_TYPES.find(t => t.value === paymentType)
+    return type ? type.label : paymentType
+}
+
+// Helper function to get today's date in YYYY-MM-DD format
+const getTodayDate = () => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
 export default function PurchasesPage() {
     const [purchases, setPurchases] = useState<Purchase[]>([])
     const [suppliers, setSuppliers] = useState<Supplier[]>([])
     const [warehouses, setWarehouses] = useState<Warehouse[]>([])
     const [products, setProducts] = useState<Product[]>([])
-    const [defaultCurrency, setDefaultCurrency] = useState<string>("AZN") // Default currency symbol
+    const [defaultCurrency, setDefaultCurrency] = useState<string>("AZN")
     const [loading, setLoading] = useState(true)
     const [suppliersLoading, setSuppliersLoading] = useState(true)
     const [warehousesLoading, setWarehousesLoading] = useState(true)
@@ -159,25 +271,37 @@ export default function PurchasesPage() {
     const [isSubmittingForm, setIsSubmittingForm] = useState(false)
     const [deletingId, setDeletingId] = useState<number | null>(null)
     const [ignoreDialogClose, setIgnoreDialogClose] = useState(false)
+    const [isFiltering, setIsFiltering] = useState(false)
 
     // Filter states
-    const [filterPurchaseNumber, setFilterPurchaseNumber] = useState("")
+    const [filterPurchaseId, setFilterPurchaseId] = useState("")
     const [filterSupplier, setFilterSupplier] = useState<string>("all")
     const [filterWarehouse, setFilterWarehouse] = useState<string>("all")
     const [filterStatus, setFilterStatus] = useState<string>("all")
+    const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("all")
+    const [filterPaymentType, setFilterPaymentType] = useState<string>("all")
     const [filterDateFrom, setFilterDateFrom] = useState("")
     const [filterDateTo, setFilterDateTo] = useState("")
+    const [filterMinAmount, setFilterMinAmount] = useState("")
+    const [filterMaxAmount, setFilterMaxAmount] = useState("")
 
     const [formData, setFormData] = useState({
         supplierId: 0,
         warehouseId: 0,
-        purchaseDate: new Date().toISOString().slice(0, 16), // datetime-local format
-        paidAmount: "", // Changed to empty string for placeholder
+        purchaseDate: getTodayDate(),
+        paidAmount: "",
+        paymentType: "",
+        status: "PENDING",
         items: [] as PurchaseItem[],
     })
 
     const [isClient, setIsClient] = useState(false)
     const [hasToken, setHasToken] = useState(false)
+
+    const [statusUpdateDialogOpen, setStatusUpdateDialogOpen] = useState(false)
+    const [updatingPurchase, setUpdatingPurchase] = useState<Purchase | null>(null)
+    const [newStatus, setNewStatus] = useState("")
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
     // Helper function to format date with time
     const formatDateTime = (dateString: string) => {
@@ -252,7 +376,6 @@ export default function PurchasesPage() {
         if (product && product.imageUrl) {
             return product.imageUrl
         }
-        // Fallback to placeholder if no imageUrl
         const encodedName = encodeURIComponent(productName || product?.name || "product")
         return `/placeholder.svg?height=60&width=60&text=${encodedName}`
     }
@@ -286,7 +409,6 @@ export default function PurchasesPage() {
             }
             const data: Setting[] = await response.json()
 
-            // Find default currency setting
             const defaultCurrencySetting = data.find(setting => setting.key === "default_currency")
             if (defaultCurrencySetting && defaultCurrencySetting.value) {
                 setDefaultCurrency(defaultCurrencySetting.value)
@@ -407,7 +529,7 @@ export default function PurchasesPage() {
         }
     }, [])
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (filterRequest?: PurchaseFilterRequest) => {
         if (typeof window === "undefined") {
             setLoading(false)
             return
@@ -422,13 +544,21 @@ export default function PurchasesPage() {
         setHasToken(true)
         setLoading(true)
         try {
-            const response = await fetch(`http://localhost:8080/api/purchases`, {
-                method: "GET",
+            const url = filterRequest ? `http://localhost:8080/api/purchases/filter` : `http://localhost:8080/api/purchases`
+            const requestOptions: RequestInit = {
+                method: filterRequest ? "POST" : "GET",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-            })
+            }
+
+            if (filterRequest) {
+                requestOptions.body = JSON.stringify(filterRequest)
+            }
+
+            const response = await fetch(url, requestOptions)
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: "Naməlum xəta" }))
                 console.error("Alışları çəkərkən xəta:", response.status, errorData)
@@ -474,7 +604,7 @@ export default function PurchasesPage() {
 
     useEffect(() => {
         if (isClient && hasToken) {
-            fetchSettings() // Fetch settings first to get currency
+            fetchSettings()
             fetchData()
             fetchSuppliers()
             fetchWarehouses()
@@ -482,19 +612,86 @@ export default function PurchasesPage() {
         }
     }, [isClient, hasToken, fetchSettings, fetchData, fetchSuppliers, fetchWarehouses, fetchProducts])
 
-    const handleFilter = () => {
-        // Filter logic would be implemented here
-        // For now, just refetch all data
-        fetchData()
+    const handleFilter = async () => {
+        if (typeof window === "undefined") return
+        const token = localStorage.getItem("token")
+        if (!token) return
+
+        setIsFiltering(true)
+        try {
+            const filterRequest: PurchaseFilterRequest = {}
+
+            if (filterPurchaseId && filterPurchaseId.trim() !== "") {
+                const purchaseId = parseInt(filterPurchaseId.trim())
+                if (!isNaN(purchaseId)) {
+                    filterRequest.id = purchaseId
+                }
+            }
+
+            if (filterSupplier !== "all") {
+                filterRequest.supplierId = parseInt(filterSupplier)
+            }
+
+            if (filterWarehouse !== "all") {
+                filterRequest.warehouseId = parseInt(filterWarehouse)
+            }
+
+            if (filterStatus !== "all") {
+                filterRequest.status = filterStatus
+            }
+
+            if (filterPaymentStatus !== "all") {
+                filterRequest.paymentStatus = filterPaymentStatus
+            }
+
+            if (filterPaymentType !== "all") {
+                filterRequest.paymentType = filterPaymentType
+            }
+
+            if (filterDateFrom && filterDateFrom.trim() !== "") {
+                filterRequest.purchaseDate = filterDateFrom
+            }
+
+            if (filterMinAmount && filterMinAmount.trim() !== "") {
+                const minAmount = parseFloat(filterMinAmount.trim())
+                if (!isNaN(minAmount) && minAmount >= 0) {
+                    filterRequest.minTotalAmount = minAmount
+                }
+            }
+
+            if (filterMaxAmount && filterMaxAmount.trim() !== "") {
+                const maxAmount = parseFloat(filterMaxAmount.trim())
+                if (!isNaN(maxAmount) && maxAmount >= 0) {
+                    filterRequest.maxTotalAmount = maxAmount
+                }
+            }
+
+            console.log("Filter request:", filterRequest)
+            await fetchData(filterRequest)
+        } catch (error) {
+            console.error("Filter xətası:", error)
+            showSwal({
+                title: "Xəta!",
+                text: "Filterleme zamanı xəta baş verdi",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+            })
+        } finally {
+            setIsFiltering(false)
+        }
     }
 
     const resetFilters = () => {
-        setFilterPurchaseNumber("")
+        setFilterPurchaseId("")
         setFilterSupplier("all")
         setFilterWarehouse("all")
         setFilterStatus("all")
+        setFilterPaymentStatus("all")
+        setFilterPaymentType("all")
         setFilterDateFrom("")
         setFilterDateTo("")
+        setFilterMinAmount("")
+        setFilterMaxAmount("")
         fetchData()
     }
 
@@ -506,7 +703,7 @@ export default function PurchasesPage() {
                 {
                     productId: 0,
                     quantity: 1,
-                    unitPrice: NaN, // Default to NaN so input is empty
+                    unitPrice: NaN,
                     totalPrice: 0,
                 },
             ],
@@ -522,7 +719,6 @@ export default function PurchasesPage() {
         const newItems = [...formData.items]
         newItems[index] = { ...newItems[index], [field]: value }
 
-        // Auto-populate unit price when product is selected
         if (field === "productId" && value !== 0) {
             const selectedProduct = getProductById(value)
             if (selectedProduct && selectedProduct.price) {
@@ -530,7 +726,6 @@ export default function PurchasesPage() {
             }
         }
 
-        // Calculate total price when quantity or unit price changes
         if (field === "quantity" || field === "unitPrice" || field === "productId") {
             const quantity = newItems[index].quantity || 0;
             const unitPrice = newItems[index].unitPrice || 0;
@@ -556,7 +751,6 @@ export default function PurchasesPage() {
         const token = localStorage.getItem("token")
         if (!token) return
 
-        // Validate form
         if (formData.supplierId === 0) {
             showSwal({
                 title: "Xəta!",
@@ -599,7 +793,6 @@ export default function PurchasesPage() {
             return
         }
 
-        // Validate items
         for (let i = 0; i < formData.items.length; i++) {
             const item = formData.items[i]
             if (item.productId === 0) {
@@ -628,7 +821,7 @@ export default function PurchasesPage() {
                 })
                 return
             }
-            if (item.unitPrice <= 0 || isNaN(item.unitPrice)) { // Check for NaN as well
+            if (item.unitPrice <= 0 || isNaN(item.unitPrice)) {
                 showSwal({
                     title: "Xəta!",
                     text: `${i + 1}-ci məhsulun qiyməti 0-dan böyük olmalıdır`,
@@ -643,7 +836,6 @@ export default function PurchasesPage() {
             }
         }
 
-        // Validate paid amount
         const totalAmount = calculateTotalAmount()
         const paidAmount = Number.parseFloat(formData.paidAmount) || 0
         if (paidAmount < 0) {
@@ -674,16 +866,29 @@ export default function PurchasesPage() {
             return
         }
 
+        if (paidAmount > 0 && !formData.paymentType) {
+            showSwal({
+                title: "Xəta!",
+                text: "Ödəniş növü seçilməlidir",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
+            })
+            return
+        }
+
         setIsSubmittingForm(true)
         try {
-            // Convert date to ISO string format for backend
-            const purchaseDateTime = new Date(formData.purchaseDate).toISOString()
-
             const requestData = {
                 supplierId: formData.supplierId,
                 warehouseId: formData.warehouseId,
-                purchaseDate: purchaseDateTime, // Send as ISO string
-                paidAmount: paidAmount, // Ödənilən məbləğ
+                purchaseDate: formData.purchaseDate,
+                paidAmount: paidAmount,
+                paymentType: paidAmount > 0 ? formData.paymentType : null,
+                status: formData.status,
                 items: formData.items.map((item) => ({
                     productId: item.productId,
                     quantity: item.quantity,
@@ -766,15 +971,88 @@ export default function PurchasesPage() {
         setFormData({
             supplierId: 0,
             warehouseId: 0,
-            purchaseDate: new Date().toISOString().slice(0, 16), // datetime-local format
-            paidAmount: "", // Reset to empty string
+            purchaseDate: getTodayDate(),
+            paidAmount: "",
+            paymentType: "",
+            status: "PENDING",
             items: [],
         })
         setEditingPurchase(null)
     }
 
+    const handleUpdateStatus = async () => {
+        if (!updatingPurchase || !newStatus) return
+        if (typeof window === "undefined") return
+        const token = localStorage.getItem("token")
+        if (!token) return
+
+        setIsUpdatingStatus(true)
+        try {
+            const response = await fetch(`http://localhost:8080/api/purchases/${updatingPurchase.id}/status?status=${newStatus}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            })
+
+            let responseData: ApiResponse = {}
+            try {
+                responseData = await response.json()
+            } catch (e) {
+                responseData = {}
+            }
+
+            if (response.ok) {
+                await showSwal({
+                    title: "Uğurlu!",
+                    text: "Status uğurla yeniləndi",
+                    icon: "success",
+                    confirmButtonColor: "#10b981",
+                    timer: 2000,
+                    timerProgressBar: true,
+                })
+                setStatusUpdateDialogOpen(false)
+                setUpdatingPurchase(null)
+                setNewStatus("")
+                await fetchData()
+            } else {
+                let errorMessage = responseData.message || responseData.error || "Status yenilənmədi"
+                showSwal({
+                    title: "Xəta!",
+                    text: errorMessage,
+                    icon: "error",
+                    confirmButtonColor: "#ef4444",
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpenCustom: () => setIgnoreDialogClose(true),
+                    willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
+                })
+            }
+        } catch (error) {
+            console.error("Status yeniləmə xətası:", error)
+            showSwal({
+                title: "Xəta!",
+                text: "Bağlantı xətası baş verdi",
+                icon: "error",
+                confirmButtonColor: "#ef4444",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpenCustom: () => setIgnoreDialogClose(true),
+                willCloseCustom: () => setTimeout(() => setIgnoreDialogClose(false), 50),
+            })
+        } finally {
+            setIsUpdatingStatus(false)
+        }
+    }
+
+    const handleOpenStatusUpdate = (purchase: Purchase) => {
+        setUpdatingPurchase(purchase)
+        setNewStatus("")
+        setStatusUpdateDialogOpen(true)
+    }
+
     useEffect(() => {
-        // SweetAlert CSS stilləri
         const style = document.createElement("style")
         style.textContent = `
     .swal-container, .swal2-container {
@@ -829,7 +1107,6 @@ export default function PurchasesPage() {
         )
     }
 
-    // Initial full-page loading for data
     if (loading && suppliersLoading && warehousesLoading && productsLoading && settingsLoading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -868,7 +1145,7 @@ export default function PurchasesPage() {
                         </DialogHeader>
                         <form onSubmit={handleSubmit}>
                             <div className="grid gap-6 py-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="supplier">Təchizatçı *</Label>
                                         <Select
@@ -908,16 +1185,35 @@ export default function PurchasesPage() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="purchaseDate">Alış tarixi və vaxtı *</Label>
+                                        <Label htmlFor="purchaseDate">Alış tarixi *</Label>
                                         <input
                                             id="purchaseDate"
-                                            type="datetime-local"
+                                            type="date"
                                             value={formData.purchaseDate}
                                             onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
                                             disabled={isSubmittingForm}
                                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                             required
                                         />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="status">Status *</Label>
+                                        <Select
+                                            value={formData.status}
+                                            onValueChange={(value) => setFormData({ ...formData, status: value })}
+                                            disabled={isSubmittingForm}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Status seçin..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {PURCHASE_STATUSES.map((status) => (
+                                                    <SelectItem key={status.value} value={status.value}>
+                                                        {status.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
 
@@ -1036,34 +1332,59 @@ export default function PurchasesPage() {
 
                                             <Card className="bg-gray-50">
                                                 <CardContent className="p-4">
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="paidAmount">Ödənilən məbləğ</Label>
-                                                            <input
-                                                                id="paidAmount"
-                                                                type="number"
-                                                                min="0"
-                                                                step="0.01"
-                                                                max={calculateTotalAmount()}
-                                                                value={formData.paidAmount}
-                                                                onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value })}
-                                                                disabled={isSubmittingForm}
-                                                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                                placeholder="0"
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-sm font-medium text-gray-500">Ümumi məbləğ</Label>
-                                                            <div className="text-lg font-bold text-blue-600">
-                                                                {formatCurrency(calculateTotalAmount())}
+                                                    <div className="space-y-4">
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="paidAmount">Ödənilən məbləğ</Label>
+                                                                <input
+                                                                    id="paidAmount"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    max={calculateTotalAmount()}
+                                                                    value={formData.paidAmount}
+                                                                    onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value })}
+                                                                    disabled={isSubmittingForm}
+                                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label className="text-sm font-medium text-gray-500">Ümumi məbləğ</Label>
+                                                                <div className="text-lg font-bold text-blue-600">
+                                                                    {formatCurrency(calculateTotalAmount())}
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label className="text-sm font-medium text-gray-500">Qalan məbləğ</Label>
+                                                                <div className={`text-lg font-bold ${calculateRemainingAmount() > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                    {formatCurrency(calculateRemainingAmount())}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <Label className="text-sm font-medium text-gray-500">Qalan məbləğ</Label>
-                                                            <div className={`text-lg font-bold ${calculateRemainingAmount() > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                                {formatCurrency(calculateRemainingAmount())}
+                                                        {(Number.parseFloat(formData.paidAmount) || 0) > 0 && (
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <div className="space-y-2">
+                                                                    <Label htmlFor="paymentType">Ödəniş növü *</Label>
+                                                                    <Select
+                                                                        value={formData.paymentType}
+                                                                        onValueChange={(value) => setFormData({ ...formData, paymentType: value })}
+                                                                        disabled={isSubmittingForm}
+                                                                    >
+                                                                        <SelectTrigger>
+                                                                            <SelectValue placeholder="Ödəniş növü seçin..." />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {PAYMENT_TYPES.map((type) => (
+                                                                                <SelectItem key={type.value} value={type.value}>
+                                                                                    {type.label}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 </CardContent>
                                             </Card>
@@ -1126,19 +1447,37 @@ export default function PurchasesPage() {
                                             </p>
                                         </div>
                                         <div>
-                                            <Label className="text-sm font-medium text-gray-500">Alış tarixi və vaxtı</Label>
+                                            <Label className="text-sm font-medium text-gray-500">Alış tarixi</Label>
                                             <p className="text-sm font-medium flex items-center">
                                                 <Calendar className="mr-2 h-4 w-4" />
-                                                {formatDateTime(selectedPurchase.purchaseDate)}
+                                                {formatDate(selectedPurchase.purchaseDate)}
                                             </p>
                                         </div>
                                         <div>
                                             <Label className="text-sm font-medium text-gray-500">Status</Label>
                                             <div className="mt-1">
-                                                <Badge variant="default" className="w-fit">
-                                                    {selectedPurchase.status}
+                                                <Badge variant={getStatusBadgeVariant(selectedPurchase.status)} className="w-fit">
+                                                    {ALL_PURCHASE_STATUSES.find(s => s.value === selectedPurchase.status)?.label || selectedPurchase.status}
                                                 </Badge>
                                             </div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Ödəniş statusu</Label>
+                                            <div className="mt-1">
+                                                {selectedPurchase.paymentStatus ? (
+                                                    <Badge variant={getPaymentStatusBadgeVariant(selectedPurchase.paymentStatus)} className="w-fit">
+                                                        {getPaymentStatusLabel(selectedPurchase.paymentStatus)}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-sm text-gray-500">Təyin edilməyib</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-500">Ödəniş növü</Label>
+                                            <p className="text-sm font-medium">
+                                                {getPaymentTypeLabel(selectedPurchase.paymentType)}
+                                            </p>
                                         </div>
                                         <div>
                                             <Label className="text-sm font-medium text-gray-500">Ümumi məbləğ</Label>
@@ -1223,16 +1562,86 @@ export default function PurchasesPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={statusUpdateDialogOpen} onOpenChange={setStatusUpdateDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Status Yenilə</DialogTitle>
+                        <DialogDescription>
+                            {updatingPurchase ? `Alış nömrəsi: ${updatingPurchase.purchaseNumber || updatingPurchase.id}` : "Alış statusunu yeniləyin"}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {updatingPurchase && (
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-500">Cari Status</Label>
+                                <Badge variant={getStatusBadgeVariant(updatingPurchase.status)} className="w-fit">
+                                    {ALL_PURCHASE_STATUSES.find(s => s.value === updatingPurchase.status)?.label || updatingPurchase.status}
+                                </Badge>
+                            </div>
+                            {canUpdateStatus(updatingPurchase.status) ? (
+                                <div className="space-y-2">
+                                    <Label htmlFor="newStatus">Yeni Status *</Label>
+                                    <Select
+                                        value={newStatus}
+                                        onValueChange={setNewStatus}
+                                        disabled={isUpdatingStatus}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Status seçin..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {getAvailableStatusOptions(updatingPurchase.status).map((status) => (
+                                                <SelectItem key={status.value} value={status.value}>
+                                                    {status.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-500">Status Yeniləmə</Label>
+                                    <div className="p-3 bg-gray-50 rounded-md border">
+                                        <p className="text-sm text-gray-600">
+                                            Bu alışın statusu yenilənə bilməz. Yalnız "Gözləyir" statusundakı alışların statusu dəyişdirilə bilər.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter className="gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStatusUpdateDialogOpen(false)}
+                            disabled={isUpdatingStatus}
+                        >
+                            Ləğv et
+                        </Button>
+                        {canUpdateStatus(updatingPurchase?.status || "") && (
+                            <Button
+                                onClick={handleUpdateStatus}
+                                disabled={isUpdatingStatus || !newStatus}
+                            >
+                                {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Yenilə
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Card>
                 <CardHeader>
                     <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <FloatingLabelInput
-                                    id="filterPurchaseNumber"
+                                    id="filterPurchaseId"
                                     label="Alış nömrəsi"
-                                    value={filterPurchaseNumber}
-                                    onChange={(e) => setFilterPurchaseNumber(e.target.value)}
+                                    value={filterPurchaseId}
+                                    onChange={(e) => setFilterPurchaseId(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -1275,14 +1684,48 @@ export default function PurchasesPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">Hamısı</SelectItem>
-                                        <SelectItem value="PENDING">Gözləyir</SelectItem>
-                                        <SelectItem value="COMPLETED">Tamamlandı</SelectItem>
-                                        <SelectItem value="CANCELLED">Ləğv edildi</SelectItem>
+                                        {ALL_PURCHASE_STATUSES.map((status) => (
+                                            <SelectItem key={status.value} value={status.value}>
+                                                {status.label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="filter-date-from">Başlanğıc tarixi</Label>
+                                <Label htmlFor="filter-payment-status">Ödəniş statusu</Label>
+                                <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
+                                    <SelectTrigger id="filter-payment-status" className="w-full">
+                                        <SelectValue placeholder="Ödəniş statusu seçin..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Hamısı</SelectItem>
+                                        {PAYMENT_STATUSES.map((status) => (
+                                            <SelectItem key={status.value} value={status.value}>
+                                                {status.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="filter-payment-type">Ödəniş növü</Label>
+                                <Select value={filterPaymentType} onValueChange={setFilterPaymentType}>
+                                    <SelectTrigger id="filter-payment-type" className="w-full">
+                                        <SelectValue placeholder="Ödəniş növü seçin..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Hamısı</SelectItem>
+                                        {PAYMENT_TYPES.map((type) => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="filter-date-from">Alış tarixi</Label>
                                 <input
                                     id="filter-date-from"
                                     type="date"
@@ -1292,21 +1735,37 @@ export default function PurchasesPage() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="filter-date-to">Bitmə tarixi</Label>
+                                <Label htmlFor="filter-min-amount">Ən az məbləğ</Label>
                                 <input
-                                    id="filter-date-to"
-                                    type="date"
-                                    value={filterDateTo}
-                                    onChange={(e) => setFilterDateTo(e.target.value)}
+                                    id="filter-min-amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={filterMinAmount}
+                                    onChange={(e) => setFilterMinAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="filter-max-amount">Ən çox məbləğ</Label>
+                                <input
+                                    id="filter-max-amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={filterMaxAmount}
+                                    onChange={(e) => setFilterMaxAmount(e.target.value)}
+                                    placeholder="0.00"
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button onClick={handleFilter} size="icon" title="Filterlə">
-                                <Search className="h-4 w-4" />
+                            <Button onClick={handleFilter} size="icon" title="Filterlə" disabled={isFiltering}>
+                                {isFiltering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                             </Button>
-                            <Button onClick={resetFilters} size="icon" variant="outline" title="Filterləri sıfırla">
+                            <Button onClick={resetFilters} size="icon" variant="outline" title="Filterləri sıfırla" disabled={isFiltering}>
                                 <RotateCcw className="h-4 w-4" />
                             </Button>
                         </div>
@@ -1323,6 +1782,7 @@ export default function PurchasesPage() {
                                     <TableHead>Tarix</TableHead>
                                     <TableHead>Ümumi məbləğ</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Ödəniş statusu</TableHead>
                                     <TableHead>Əməliyyatlar</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -1331,7 +1791,7 @@ export default function PurchasesPage() {
                                     Array.from({ length: 5 }).map((_, index) => (
                                         <TableRow key={index}>
                                             <TableCell>
-                                                <Skeleton className="h-4 w-[120px]" />
+                                                <Skeleton className="h-4 w-[80px]" />
                                             </TableCell>
                                             <TableCell>
                                                 <Skeleton className="h-4 w-[150px]" />
@@ -1349,13 +1809,16 @@ export default function PurchasesPage() {
                                                 <Skeleton className="h-4 w-[60px]" />
                                             </TableCell>
                                             <TableCell>
+                                                <Skeleton className="h-4 w-[60px]" />
+                                            </TableCell>
+                                            <TableCell>
                                                 <Skeleton className="h-8 w-8 rounded-md" />
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 ) : purchases.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8">
+                                        <TableCell colSpan={8} className="text-center py-8">
                                             <div className="flex flex-col items-center">
                                                 <Package className="h-12 w-12 text-gray-400 mb-2" />
                                                 <p className="text-sm text-gray-500">Heç bir alış tapılmadı</p>
@@ -1365,7 +1828,7 @@ export default function PurchasesPage() {
                                 ) : (
                                     purchases.map((purchase) => (
                                         <TableRow key={purchase.id}>
-                                            <TableCell className="font-medium">{purchase.purchaseNumber || purchase.id}</TableCell>
+                                            <TableCell className="font-medium">{purchase.id}</TableCell>
                                             <TableCell>
                                                 <div className="flex items-center">
                                                     <Building2 className="mr-2 h-4 w-4 text-gray-400" />
@@ -1385,7 +1848,18 @@ export default function PurchasesPage() {
                                                 <span className="font-semibold text-green-600">{formatCurrency(purchase.totalAmount)}</span>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="default">{purchase.status}</Badge>
+                                                <Badge variant={getStatusBadgeVariant(purchase.status)}>
+                                                    {ALL_PURCHASE_STATUSES.find(s => s.value === purchase.status)?.label || purchase.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {purchase.paymentStatus ? (
+                                                    <Badge variant={getPaymentStatusBadgeVariant(purchase.paymentStatus)}>
+                                                        {getPaymentStatusLabel(purchase.paymentStatus)}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-gray-400 text-sm">-</span>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex space-x-2">
@@ -1398,6 +1872,17 @@ export default function PurchasesPage() {
                                                     >
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
+                                                    {canUpdateStatus(purchase.status) && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleOpenStatusUpdate(purchase)}
+                                                            disabled={deletingId !== null}
+                                                            title="Status yenilə"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
